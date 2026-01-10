@@ -46,10 +46,13 @@ export function DestinationCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: destination.id });
+  } = useSortable({
+    id: destination.id,
+    disabled: isEditing,
+  });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
@@ -82,7 +85,7 @@ export function DestinationCard({
         ${isActive ? 'border-2 border-terracotta card-elevated-lg' : ''}
         ${!hasLocation ? 'opacity-80' : ''}
         ${isDragging ? 'shadow-lg' : ''}
-        transition-all duration-200
+        transition-colors duration-200
       `}
     >
       {/* Drag handle - hidden on mobile */}
