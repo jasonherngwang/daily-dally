@@ -46,7 +46,10 @@ export function DestinationCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: destination.id });
+  } = useSortable({
+    id: destination.id,
+    disabled: isEditing,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
