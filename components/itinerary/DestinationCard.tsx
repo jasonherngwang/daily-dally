@@ -85,7 +85,7 @@ export function DestinationCard({
         ${isActive ? 'border-2 border-terracotta card-elevated-lg' : ''}
         ${!hasLocation ? 'opacity-80' : ''}
         ${isDragging ? 'shadow-lg' : ''}
-        transition-all duration-200
+        transition-colors duration-200
       `}
     >
       {/* Drag handle - hidden on mobile */}
