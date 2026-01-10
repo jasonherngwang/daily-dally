@@ -99,6 +99,22 @@ export default function TripPage() {
     router.push(`/trip/${tripId}?day=${newIndex}`, { scroll: false });
   };
 
+  const handleReorderDays = async (newDays: Day[]) => {
+    if (!trip) return;
+
+    // Find the new index of the active day to keep it selected/in view
+    const activeDayIndex = newDays.findIndex((d) => d.id === activeDayId);
+    
+    await updateTrip({
+      ...trip,
+      days: newDays,
+    });
+
+    if (activeDayIndex !== -1) {
+       router.push(`/trip/${tripId}?day=${activeDayIndex}`, { scroll: false });
+    }
+  };
+
   const handleRenameDay = async (dayId: string, newLabel: string) => {
     if (!trip) return;
 
@@ -162,7 +178,7 @@ export default function TripPage() {
                 onDaySelect={handleDaySelect}
                 onAddDay={handleAddDay}
                 onDeleteDay={handleDeleteDay}
-                onReorderDay={handleReorderDay}
+                onReorderDays={handleReorderDays}
                 onRenameDay={handleRenameDay}
               />
               <DayEditor
