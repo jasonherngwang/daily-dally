@@ -9,7 +9,7 @@ export default function HomePage() {
             Daily Dally
           </h1>
           <p className="text-xl sm:text-2xl text-ink-light font-light tracking-wide">
-            Your journey, day by day
+            Plan a trip with a daily itinerary and map
           </p>
         </div>
         

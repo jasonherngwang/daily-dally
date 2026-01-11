@@ -3,8 +3,8 @@ import './globals.css';
 import { GoogleMapsInit } from '@/components/map/GoogleMapsInit';
 
 export const metadata: Metadata = {
-  title: 'Daily Dally - Your journey, day by day',
-  description: 'Plan your trips day by day with integrated maps and itineraries',
+  title: 'Daily Dally',
+  description: 'Plan a trip with a daily itinerary and map',
 };
 
 export default function RootLayout({
