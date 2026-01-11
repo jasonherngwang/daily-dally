@@ -24,6 +24,7 @@ interface DestinationListProps {
   onUpdate: (index: number, destination: Destination) => void;
   onDelete: (index: number) => void;
   activeDestinationId?: string;
+  readOnly?: boolean;
 }
 
 export function DestinationList({
@@ -32,6 +33,7 @@ export function DestinationList({
   onUpdate,
   onDelete,
   activeDestinationId,
+  readOnly = false,
 }: DestinationListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -46,6 +48,7 @@ export function DestinationList({
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
+    if (readOnly) return;
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
@@ -81,6 +84,32 @@ export function DestinationList({
     }
     return { destination, locationNumber, previousDestination };
   });
+
+  if (readOnly) {
+    return (
+      <div className="flex flex-col">
+        {renderItems.map(({ destination, locationNumber, previousDestination }, index) => {
+          const isLast = index === validDestinations.length - 1;
+          return (
+            <div
+              key={destination.id || `destination-${index}`}
+              className={isLast ? '' : 'mb-3'}
+            >
+              <DestinationCard
+                destination={destination}
+                locationNumber={locationNumber}
+                previousDestination={previousDestination}
+                isActive={destination.id === activeDestinationId}
+                readOnly
+                onUpdate={() => {}}
+                onDelete={() => {}}
+              />
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <DndContext
