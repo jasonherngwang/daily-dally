@@ -192,16 +192,6 @@ export async function getTripAccessByToken(token: string): Promise<TripAccess | 
     };
   }
 
-  // 3) Back-compat: treat raw tripId as an edit link
-  const legacyTrip = await getTrip(token);
-  if (legacyTrip) {
-    return {
-      trip: legacyTrip,
-      role: 'edit',
-      tokens: { editToken: token },
-    };
-  }
-
   return null;
 }
 

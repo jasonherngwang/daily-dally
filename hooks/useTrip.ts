@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { Trip } from '@/types/trip';
+import { upsertRecentTrip } from '@/lib/recents';
 
 type TripAccessRole = 'view' | 'edit';
 
@@ -39,6 +40,13 @@ export function useTrip(tripToken: string | null) {
       setTrip(data.trip);
       setAccessRole(data.accessRole);
       setTokens(data.tokens || {});
+      upsertRecentTrip({
+        token: tripToken,
+        tripId: data.trip.id,
+        name: data.trip.name,
+        accessRole: data.accessRole,
+        updatedAt: data.trip.updatedAt,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load trip');
     } finally {
@@ -79,6 +87,15 @@ export function useTrip(tripToken: string | null) {
         setTrip(data.trip);
         setAccessRole(data.accessRole);
         setTokens(data.tokens || {});
+        if (tripToken) {
+          upsertRecentTrip({
+            token: tripToken,
+            tripId: data.trip.id,
+            name: data.trip.name,
+            accessRole: data.accessRole,
+            updatedAt: data.trip.updatedAt,
+          });
+        }
       } catch (err) {
         setTrip(trip);
         setError(err instanceof Error ? err.message : 'Failed to save changes');
