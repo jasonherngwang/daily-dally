@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { importLibrary } from '@googlemaps/js-api-loader';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -61,18 +61,13 @@ export function PlaceSearch({
     initPlaces();
   }, [hasApiKey]);
 
-  useEffect(() => {
-    // Ensure we can type immediately after tapping "Search for a place".
+  useLayoutEffect(() => {
+    // Best-effort mobile behavior: focus immediately on mount.
+    // Some mobile browsers will still block programmatic focus, but removing any async gating helps a lot.
     if (!hasApiKey) return;
-    if (isBootstrapping) return;
-
-    const id = window.setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }, 0);
-
-    return () => window.clearTimeout(id);
-  }, [hasApiKey, isBootstrapping]);
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [hasApiKey]);
 
   useEffect(() => {
     return () => {
@@ -157,6 +152,7 @@ export function PlaceSearch({
       <div className="relative">
         <Input
           ref={inputRef}
+          autoFocus
           value={value}
           onChange={(e) => {
             const next = e.target.value;
