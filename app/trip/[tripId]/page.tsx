@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useTrip } from '@/hooks/useTrip';
 import { TripHeader } from '@/components/trip/TripHeader';
@@ -19,20 +19,35 @@ export default function TripPage() {
 
   const { trip, isLoading, error, updateTrip } = useTrip(tripId);
   const [activeDayId, setActiveDayId] = useState<string | null>(null);
+  const lastDayParamRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (trip && trip.days.length > 0) {
       const dayParam = searchParams.get('day');
+      const dayParamChanged = dayParam !== lastDayParamRef.current;
+      lastDayParamRef.current = dayParam;
+
+      const activeDayStillExists = activeDayId
+        ? trip.days.some((d) => d.id === activeDayId)
+        : false;
+
       if (dayParam) {
         const dayIndex = parseInt(dayParam, 10);
         if (dayIndex >= 0 && dayIndex < trip.days.length) {
-          setActiveDayId(trip.days[dayIndex].id);
+          const dayFromUrl = trip.days[dayIndex].id;
+          // Only sync from URL when the URL actually changed (e.g. back/forward navigation),
+          // or when the current active day no longer exists (e.g. deleted).
+          if ((!activeDayStillExists && activeDayId !== dayFromUrl) || (dayParamChanged && activeDayId !== dayFromUrl)) {
+            setActiveDayId(dayFromUrl);
+          }
           return;
         }
       }
-      setActiveDayId(trip.days[0].id);
+      if (!activeDayStillExists) {
+        setActiveDayId(trip.days[0].id);
+      }
     }
-  }, [trip, searchParams]);
+  }, [trip, searchParams, activeDayId]);
 
   const handleDaySelect = (dayId: string) => {
     if (!trip) return;

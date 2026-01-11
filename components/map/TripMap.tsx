@@ -26,19 +26,23 @@ export function TripMap({
   const [isMapReady, setIsMapReady] = useState(false);
   const destinationsKeyRef = useRef<string>('');
 
-  const destinationsKey = useMemo(
-    () => {
-      const withLocation = destinations.filter((d) => d.location?.lat && d.location?.lng);
-      return withLocation
-        .map((d) => `${d.id}:${d.location?.lat},${d.location?.lng}`)
-        .join('|');
-    },
-    [destinations]
+  const hasValidLocation = useCallback(
+    (d: Destination) =>
+      d.location != null &&
+      Number.isFinite(d.location.lat) &&
+      Number.isFinite(d.location.lng),
+    []
   );
 
+  const destinationsKey = useMemo(() => {
+    // Include order + coordinates so any route/order change triggers a refresh.
+    const withLocation = destinations.filter(hasValidLocation);
+    return withLocation.map((d) => `${d.id}:${d.location!.lat},${d.location!.lng}`).join('|');
+  }, [destinations, hasValidLocation]);
+
   const destinationsWithLocation = useMemo(
-    () => destinations.filter((d) => d.location?.lat && d.location?.lng),
-    [destinations]
+    () => destinations.filter(hasValidLocation),
+    [destinations, hasValidLocation]
   );
 
   const handleDestinationClick = useCallback(
@@ -177,6 +181,10 @@ export function TripMap({
 
       const currentKey = destinationsKey;
       if (destinationsKeyRef.current === currentKey && markersRef.current.length === destinationsWithLocation.length) {
+        // Still ensure directions are in sync (cheap, and avoids stale polylines).
+        if (destinationsWithLocation.length >= 2 && directionsServiceRef.current && directionsRendererRef.current) {
+          requestDirections(destinationsWithLocation);
+        }
         return;
       }
 
@@ -239,7 +247,7 @@ export function TripMap({
     };
 
     updateMarkers();
-  }, [isMapReady, destinationsKey, destinationsWithLocation.length, destinations.length, activeDestinationId, handleDestinationClick]);
+  }, [isMapReady, destinationsKey, destinationsWithLocation, destinations.length, activeDestinationId, handleDestinationClick]);
 
   useEffect(() => {
     if (!mapInstanceRef.current || markersRef.current.length === 0) return;

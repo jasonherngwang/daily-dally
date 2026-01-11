@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { GripVertical, Edit2, Trash2, Navigation } from 'lucide-react';
+import { GripVertical, Edit2, Trash2, Navigation, FileText } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card } from '@/components/ui/Card';
@@ -14,7 +14,7 @@ import type { Destination } from '@/types/trip';
 
 interface DestinationCardProps {
   destination: Destination;
-  index: number;
+  locationNumber?: number;
   previousDestination?: Destination;
   isActive?: boolean;
   onUpdate: (updated: Destination) => void;
@@ -23,7 +23,7 @@ interface DestinationCardProps {
 
 export function DestinationCard({
   destination,
-  index,
+  locationNumber,
   previousDestination,
   isActive,
   onUpdate,
@@ -100,7 +100,11 @@ export function DestinationCard({
           ${hasLocation ? 'bg-terracotta text-white shadow-sm' : 'bg-border/60 text-ink-light'}
         `}
       >
-        {index + 1}
+        {hasLocation ? (
+          locationNumber
+        ) : (
+          <FileText className="h-3.5 w-3.5" aria-label="Note" />
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
