@@ -11,9 +11,10 @@ interface DayEditorProps {
   day: Day;
   trip: Trip;
   onUpdate: (day: Day) => void;
+  readOnly?: boolean;
 }
 
-export function DayEditor({ day, trip, onUpdate }: DayEditorProps) {
+export function DayEditor({ day, trip, onUpdate, readOnly = false }: DayEditorProps) {
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [dayLabel, setDayLabel] = useState(day.label);
 
@@ -26,36 +27,42 @@ export function DayEditor({ day, trip, onUpdate }: DayEditorProps) {
 
   return (
     <div className="space-y-4 min-w-0">
-      <AddDestinationForm
-        locationBias={
-          day.destinations.length > 0
-            ? day.destinations
-                .filter((d) => d.location)
-                .slice(-1)[0]?.location
-            : undefined
-        }
-        onAdd={(destination) => {
-          onUpdate({
-            ...day,
-            destinations: [
-              ...day.destinations,
-              { ...destination, id: generateId() },
-            ],
-          });
-        }}
-      />
+      {!readOnly && (
+        <AddDestinationForm
+          locationBias={
+            day.destinations.length > 0
+              ? day.destinations
+                  .filter((d) => d.location)
+                  .slice(-1)[0]?.location
+              : undefined
+          }
+          onAdd={(destination) => {
+            onUpdate({
+              ...day,
+              destinations: [
+                ...day.destinations,
+                { ...destination, id: generateId() },
+              ],
+            });
+          }}
+        />
+      )}
 
       <DestinationList
         destinations={day.destinations}
+        readOnly={readOnly}
         onReorder={(destinations) => {
+          if (readOnly) return;
           onUpdate({ ...day, destinations });
         }}
         onUpdate={(index, destination) => {
+          if (readOnly) return;
           const updated = [...day.destinations];
           updated[index] = destination;
           onUpdate({ ...day, destinations: updated });
         }}
         onDelete={(index) => {
+          if (readOnly) return;
           const updated = day.destinations.filter((_, i) => i !== index);
           onUpdate({ ...day, destinations: updated });
         }}

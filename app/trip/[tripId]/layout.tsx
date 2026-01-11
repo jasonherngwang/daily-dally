@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getTrip } from '@/lib/kv';
+import { getTripAccessByToken } from '@/lib/kv';
 
 export default async function TripLayout({
   children,
@@ -9,9 +9,9 @@ export default async function TripLayout({
   params: Promise<{ tripId: string }>;
 }) {
   const { tripId } = await params;
-  const trip = await getTrip(tripId);
+  const access = await getTripAccessByToken(tripId);
 
-  if (!trip) {
+  if (!access) {
     notFound();
   }
 

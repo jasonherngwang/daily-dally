@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTrip, saveTrip, deleteTrip } from '@/lib/kv';
+import {
+  deleteCapabilitiesForTrip,
+  deleteTrip,
+  getTripAccessByToken,
+  saveTrip,
+} from '@/lib/kv';
 import type { Trip } from '@/types/trip';
 
 export async function GET(
@@ -7,17 +12,21 @@ export async function GET(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   try {
-    const { tripId } = await params;
-    const trip = await getTrip(tripId);
+    const { tripId: token } = await params;
+    const access = await getTripAccessByToken(token);
 
-    if (!trip) {
+    if (!access) {
       return NextResponse.json(
         { error: 'Trip not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(trip);
+    return NextResponse.json({
+      trip: access.trip,
+      accessRole: access.role,
+      tokens: access.tokens,
+    });
   } catch (error) {
     console.error('Error fetching trip:', error);
     return NextResponse.json(
@@ -32,7 +41,16 @@ export async function PUT(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   try {
-    const { tripId } = await params;
+    const { tripId: token } = await params;
+    const access = await getTripAccessByToken(token);
+    if (!access) {
+      return NextResponse.json({ error: 'Trip not found' }, { status: 404 });
+    }
+    if (access.role !== 'edit') {
+      return NextResponse.json({ error: 'Read-only link' }, { status: 403 });
+    }
+
+    const tripId = access.trip.id;
     const updates: Trip = await request.json();
 
     // Ensure the tripId in the URL matches the trip ID in the body
@@ -52,7 +70,11 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json(updates);
+    return NextResponse.json({
+      trip: updates,
+      accessRole: 'edit',
+      tokens: access.tokens,
+    });
   } catch (error) {
     console.error('Error updating trip:', error);
     return NextResponse.json(
@@ -67,7 +89,16 @@ export async function DELETE(
   { params }: { params: Promise<{ tripId: string }> }
 ) {
   try {
-    const { tripId } = await params;
+    const { tripId: token } = await params;
+    const access = await getTripAccessByToken(token);
+    if (!access) {
+      return NextResponse.json({ error: 'Trip not found' }, { status: 404 });
+    }
+    if (access.role !== 'edit') {
+      return NextResponse.json({ error: 'Read-only link' }, { status: 403 });
+    }
+
+    const tripId = access.trip.id;
     const success = await deleteTrip(tripId);
 
     if (!success) {
@@ -77,6 +108,7 @@ export async function DELETE(
       );
     }
 
+    await deleteCapabilitiesForTrip(tripId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting trip:', error);

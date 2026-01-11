@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateId } from '@/lib/ulid';
-import { saveTrip } from '@/lib/kv';
+import { createTripCapabilityLinks, saveTrip } from '@/lib/kv';
 import type { Trip, Day } from '@/types/trip';
 
 export async function POST(request: NextRequest) {
@@ -41,7 +41,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(trip, { status: 201 });
+    const tokens = await createTripCapabilityLinks(trip.id);
+    if (!tokens) {
+      return NextResponse.json(
+        { error: 'Failed to create share links' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        trip,
+        accessRole: 'edit',
+        tokens,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error creating trip:', error);
     return NextResponse.json(
