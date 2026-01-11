@@ -8,6 +8,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragCancelEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -17,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { DestinationCard } from './DestinationCard';
 import type { Destination } from '@/types/trip';
+import { useRef } from 'react';
 
 interface DestinationListProps {
   destinations: Destination[];
@@ -24,6 +27,7 @@ interface DestinationListProps {
   onUpdate: (index: number, destination: Destination) => void;
   onDelete: (index: number) => void;
   activeDestinationId?: string;
+  onSelectDestination?: (destinationId: string) => void;
   readOnly?: boolean;
 }
 
@@ -33,8 +37,11 @@ export function DestinationList({
   onUpdate,
   onDelete,
   activeDestinationId,
+  onSelectDestination,
   readOnly = false,
 }: DestinationListProps) {
+  const isDraggingRef = useRef(false);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -47,9 +54,18 @@ export function DestinationList({
     })
   );
 
+  const handleDragStart = (_event: DragStartEvent) => {
+    isDraggingRef.current = true;
+  };
+
+  const handleDragCancel = (_event: DragCancelEvent) => {
+    isDraggingRef.current = false;
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     if (readOnly) return;
     const { active, over } = event;
+    isDraggingRef.current = false;
 
     if (over && active.id !== over.id) {
       const oldIndex = destinations.findIndex((d) => d.id === active.id);
@@ -92,8 +108,19 @@ export function DestinationList({
           const isLast = index === validDestinations.length - 1;
           return (
             <div
+              id={`destination-${destination.id}`}
               key={destination.id || `destination-${index}`}
               className={isLast ? '' : 'mb-3'}
+              onPointerDownCapture={(e) => {
+                if (!onSelectDestination) return;
+                if (isDraggingRef.current) return;
+                if (!hasValidLocation(destination)) return;
+                const t = e.target as HTMLElement | null;
+                // Don't select when interacting with buttons/inputs/links, etc.
+                // NOTE: dnd-kit applies `role="button"` to the draggable card; do not treat that as an interactive child.
+                if (t?.closest('button, a, input, textarea, select')) return;
+                onSelectDestination(destination.id);
+              }}
             >
               <DestinationCard
                 destination={destination}
@@ -115,6 +142,8 @@ export function DestinationList({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
       <SortableContext
@@ -127,8 +156,17 @@ export function DestinationList({
             const isLast = index === validDestinations.length - 1;
             return (
               <div 
+                id={`destination-${destination.id}`}
                 key={destination.id || `destination-${index}`} 
                 className={isLast ? '' : 'mb-3'}
+                onPointerDownCapture={(e) => {
+                  if (!onSelectDestination) return;
+                  if (isDraggingRef.current) return;
+                  if (!hasValidLocation(destination)) return;
+                  const t = e.target as HTMLElement | null;
+                  if (t?.closest('button, a, input, textarea, select')) return;
+                  onSelectDestination(destination.id);
+                }}
               >
                 <DestinationCard
                   destination={destination}

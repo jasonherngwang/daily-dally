@@ -9,16 +9,23 @@ interface TripMapProps {
   destinations: Destination[];
   activeDestinationId?: string;
   onDestinationClick?: (id: string) => void;
+  onDestinationHover?: (id: string | null) => void;
+  onMapClick?: () => void;
+  previewLocation?: { lat: number; lng: number } | null;
 }
 
 export function TripMap({
   destinations,
   activeDestinationId,
   onDestinationClick,
+  onDestinationHover,
+  onMapClick,
+  previewLocation = null,
 }: TripMapProps) {
   const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID?.trim() || null;
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   const markersRef = useRef<
     (google.maps.marker.AdvancedMarkerElement | google.maps.Marker)[]
   >([]);
@@ -28,6 +35,7 @@ export function TripMap({
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(
     null
   );
+  const previewMarkerRef = useRef<google.maps.Marker | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
@@ -61,6 +69,15 @@ export function TripMap({
       }
     },
     [onDestinationClick]
+  );
+
+  const handleDestinationHover = useCallback(
+    (id: string | null) => {
+      if (onDestinationHover) {
+        onDestinationHover(id);
+      }
+    },
+    [onDestinationHover]
   );
 
   useEffect(() => {
@@ -105,6 +122,14 @@ export function TripMap({
           });
         }
 
+        // Map background click clears selection (but avoid duplicate listeners).
+        if (mapInstanceRef.current && onMapClick && !mapClickListenerRef.current) {
+          mapClickListenerRef.current = mapInstanceRef.current.addListener(
+            "click",
+            () => onMapClick()
+          );
+        }
+
         setIsMapReady(true);
         setIsLoading(false);
       } catch (error) {
@@ -131,12 +156,36 @@ export function TripMap({
         if (directionsRendererRef.current) {
           directionsRendererRef.current.setMap(null);
         }
+        if (previewMarkerRef.current) {
+          previewMarkerRef.current.setMap(null);
+          previewMarkerRef.current = null;
+        }
+        if (mapClickListenerRef.current) {
+          mapClickListenerRef.current.remove();
+          mapClickListenerRef.current = null;
+        }
         mapInstanceRef.current = null;
         directionsServiceRef.current = null;
         directionsRendererRef.current = null;
       }
     };
   }, []);
+
+  // If a destination is selected from the list, ensure it's visible on the map.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !isMapReady) return;
+    if (!activeDestinationId) return;
+    const d = destinationsWithLocation.find((x) => x.id === activeDestinationId);
+    if (!d?.location) return;
+    const latLng = new google.maps.LatLng(d.location.lat, d.location.lng);
+    const bounds = map.getBounds();
+    if (bounds && bounds.contains(latLng)) return;
+    map.panTo(latLng);
+    if ((map.getZoom() ?? 0) < 12) {
+      map.setZoom(12);
+    }
+  }, [activeDestinationId, destinationsWithLocation, isMapReady]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -172,6 +221,55 @@ export function TripMap({
       window.removeEventListener("resize", handleResize);
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !isMapReady) return;
+
+    if (!previewLocation) {
+      if (previewMarkerRef.current) {
+        previewMarkerRef.current.setMap(null);
+        previewMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24">
+        <path fill="#7C3AED" stroke="#FFFFFF" stroke-width="1.5" d="M12 22s8-4.5 8-12a8 8 0 1 0-16 0c0 7.5 8 12 8 12Z"/>
+        <circle cx="12" cy="10" r="3.4" fill="#FFFFFF"/>
+      </svg>
+    `.trim();
+    const url = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    const latLng = new google.maps.LatLng(previewLocation.lat, previewLocation.lng);
+
+    if (!previewMarkerRef.current) {
+      previewMarkerRef.current = new google.maps.Marker({
+        map,
+        position: previewLocation,
+        clickable: false,
+        zIndex: 1000000,
+        icon: {
+          url,
+          scaledSize: new google.maps.Size(40, 40),
+          anchor: new google.maps.Point(20, 40),
+        },
+      });
+    } else {
+      previewMarkerRef.current.setPosition(previewLocation);
+      previewMarkerRef.current.setMap(map);
+      previewMarkerRef.current.setZIndex(1000000);
+    }
+
+    const bounds = map.getBounds();
+    if (bounds && !bounds.contains(latLng)) {
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      const next = new google.maps.LatLngBounds(sw, ne);
+      next.extend(latLng);
+      map.fitBounds(next, 80);
+    }
+  }, [previewLocation, isMapReady]);
 
   function requestDirections(dests: Destination[]) {
     if (!directionsServiceRef.current || !directionsRendererRef.current) return;
@@ -305,6 +403,10 @@ export function TripMap({
           marker.addListener("gmp-click", () => {
             handleDestinationClick(destination.id);
           });
+
+          // Best-effort hover events (varies by environment).
+          marker.addListener("gmp-mouseover", () => handleDestinationHover(destination.id));
+          marker.addListener("gmp-mouseout", () => handleDestinationHover(null));
         } else {
           // Fallback: keep the app working even without a Map ID.
           // (This will still show the deprecation warning until a Map ID is configured.)
@@ -324,6 +426,8 @@ export function TripMap({
           marker.addListener("click", () => {
             handleDestinationClick(destination.id);
           });
+          marker.addListener("mouseover", () => handleDestinationHover(destination.id));
+          marker.addListener("mouseout", () => handleDestinationHover(null));
         }
 
         markers.push(marker);
