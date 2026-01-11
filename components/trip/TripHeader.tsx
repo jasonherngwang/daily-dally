@@ -111,7 +111,7 @@ export function TripHeader({
                   setIsEditing(false);
                 }
               }}
-              className="flex-1 bg-transparent text-xl sm:text-2xl font-display font-bold text-ink focus:outline-none focus:ring-2 focus:ring-forest rounded-lg px-2 py-1"
+              className="flex-1 bg-transparent text-xl sm:text-2xl font-display font-bold text-ink focus:outline-none focus:ring-2 focus:ring-forest rounded-lg px-2 py-1 leading-tight"
               autoFocus
             />
             {isReadOnly && <Badge variant="warning">Read-only</Badge>}
@@ -120,7 +120,7 @@ export function TripHeader({
           <div className="flex items-center gap-2 min-w-0">
             <h1
               className={[
-                'text-xl sm:text-2xl font-display font-bold text-ink leading-tight truncate',
+                'text-xl sm:text-2xl font-display font-bold text-ink leading-tight truncate px-2 py-1',
                 isReadOnly
                   ? 'cursor-default'
                   : 'cursor-pointer hover:text-ink-light transition-colors',

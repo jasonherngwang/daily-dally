@@ -180,7 +180,6 @@ export default function TripPage() {
                 onDaySelect={handleDaySelect}
                 onAddDay={handleAddDay}
                 onReorderDays={handleReorderDays}
-                onRenameDay={handleRenameDay}
                 readOnly={isReadOnly}
               />
               <DayEditor
@@ -188,6 +187,7 @@ export default function TripPage() {
                 trip={trip}
                 readOnly={isReadOnly}
                 onDeleteDay={handleDeleteDay}
+                onRenameDay={handleRenameDay}
                 onUpdate={(updatedDay) => {
                   if (isReadOnly) return;
                   const updatedDays = trip.days.map((d) =>
