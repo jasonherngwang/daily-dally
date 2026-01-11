@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useTrip } from '@/hooks/useTrip';
 import { TripHeader } from '@/components/trip/TripHeader';
@@ -9,7 +9,7 @@ import { DayEditor } from '@/components/itinerary/DayEditor';
 import { TripMap } from '@/components/map/TripMap';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { generateId } from '@/lib/ulid';
-import type { Day } from '@/types/trip';
+import type { Coordinates, Day } from '@/types/trip';
 
 export default function TripPage() {
   const params = useParams();
@@ -32,6 +32,67 @@ export default function TripPage() {
 
   const activeDay = trip?.days?.[activeDayIndex];
   const activeDayId = activeDay?.id || '';
+  const [preview, setPreview] = useState<{
+    dayId: string;
+    location: Coordinates | null;
+  }>({ dayId: '', location: null });
+
+  const [selected, setSelected] = useState<{ dayId: string; id: string | null }>({
+    dayId: '',
+    id: null,
+  });
+  const [hovered, setHovered] = useState<{ dayId: string; id: string | null }>({
+    dayId: '',
+    id: null,
+  });
+
+  const previewLocation =
+    preview.dayId === activeDayId ? preview.location : null;
+
+  const handlePreviewLocationChange = useCallback(
+    (location: Coordinates | null) => {
+      setPreview((prev) => {
+        // Avoid useless state updates (helps prevent render loops).
+        const sameDay = prev.dayId === activeDayId;
+        const sameLoc =
+          (prev.location == null && location == null) ||
+          (prev.location != null &&
+            location != null &&
+            prev.location.lat === location.lat &&
+            prev.location.lng === location.lng);
+        if (sameDay && sameLoc) return prev;
+        return { dayId: activeDayId, location };
+      });
+    },
+    [activeDayId]
+  );
+
+  const activeDestinationId =
+    (hovered.dayId === activeDayId ? hovered.id : null) ??
+    (selected.dayId === activeDayId ? selected.id : null) ??
+    undefined;
+
+  const handleMapDestinationHover = useCallback(
+    (id: string | null) => {
+      setHovered({ dayId: activeDayId, id });
+    },
+    [activeDayId]
+  );
+
+  const handleMapDestinationClick = useCallback(
+    (id: string) => {
+      setSelected({ dayId: activeDayId, id });
+      // Scroll card into view (DestinationList sets wrapper ids).
+      const el = document.getElementById(`destination-${id}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    },
+    [activeDayId]
+  );
+
+  const handleMapClick = useCallback(() => {
+    setSelected({ dayId: activeDayId, id: null });
+    setHovered({ dayId: activeDayId, id: null });
+  }, [activeDayId]);
 
   const handleDaySelect = (dayId: string) => {
     if (!trip) return;
@@ -183,9 +244,17 @@ export default function TripPage() {
                 readOnly={isReadOnly}
               />
               <DayEditor
+                key={activeDayId}
+                tripToken={tripToken}
                 day={activeDay}
                 trip={trip}
                 readOnly={isReadOnly}
+                onPreviewLocationChange={handlePreviewLocationChange}
+                activeDestinationId={activeDestinationId}
+                onSelectDestination={(id) => {
+                  setSelected({ dayId: activeDayId, id });
+                  setHovered({ dayId: activeDayId, id: null });
+                }}
                 onDeleteDay={handleDeleteDay}
                 onRenameDay={handleRenameDay}
                 onUpdate={(updatedDay) => {
@@ -202,7 +271,11 @@ export default function TripPage() {
               <TripMap
                 key={activeDayId}
                 destinations={activeDay.destinations}
-                activeDestinationId={undefined}
+                activeDestinationId={activeDestinationId}
+                previewLocation={previewLocation}
+                onDestinationClick={handleMapDestinationClick}
+                onDestinationHover={handleMapDestinationHover}
+                onMapClick={handleMapClick}
               />
             </div>
           </div>

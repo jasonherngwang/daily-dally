@@ -8,23 +8,31 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { IconButton } from '@/components/ui/IconButton';
 import { generateId } from '@/lib/ulid';
-import type { Day, Trip } from '@/types/trip';
+import type { Coordinates, Day, Trip } from '@/types/trip';
 
 interface DayEditorProps {
+  tripToken: string;
   day: Day;
   trip: Trip;
   onUpdate: (day: Day) => void;
   onDeleteDay?: (dayId: string) => void;
   onRenameDay?: (dayId: string, newLabel: string) => void;
+  onPreviewLocationChange?: (location: Coordinates | null) => void;
+  activeDestinationId?: string;
+  onSelectDestination?: (destinationId: string) => void;
   readOnly?: boolean;
 }
 
 export function DayEditor({
+  tripToken,
   day,
   trip,
   onUpdate,
   onDeleteDay,
   onRenameDay,
+  onPreviewLocationChange,
+  activeDestinationId,
+  onSelectDestination,
   readOnly = false,
 }: DayEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -116,6 +124,16 @@ export function DayEditor({
                   .slice(-1)[0]?.location
               : undefined
           }
+          discover={{
+            tripToken,
+            dayId: day.id,
+            destinations: day.destinations,
+            onPreviewLocationChange,
+            onInsert: (nextDestinations) => {
+              if (readOnly) return;
+              onUpdate({ ...day, destinations: nextDestinations });
+            },
+          }}
           onAdd={(destination) => {
             onUpdate({
               ...day,
@@ -131,6 +149,8 @@ export function DayEditor({
       <DestinationList
         destinations={day.destinations}
         readOnly={readOnly}
+        activeDestinationId={activeDestinationId}
+        onSelectDestination={onSelectDestination}
         onReorder={(destinations) => {
           if (readOnly) return;
           onUpdate({ ...day, destinations });
