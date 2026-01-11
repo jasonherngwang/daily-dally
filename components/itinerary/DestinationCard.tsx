@@ -84,17 +84,19 @@ export function DestinationCard({
       {...attributes}
       {...listeners}
       className={`
-        flex items-start gap-2 sm:gap-3 sm:cursor-grab sm:active:cursor-grabbing touch-manipulation
+        flex items-start gap-2 sm:gap-3 ${!readOnly ? 'sm:cursor-grab sm:active:cursor-grabbing touch-manipulation' : ''}
         ${isActive ? 'border-2 border-terracotta card-elevated-lg' : ''}
         ${!hasLocation ? 'opacity-80' : ''}
         ${isDragging ? 'shadow-lg' : ''}
         transition-colors duration-200
       `}
     >
-      {/* Drag handle - hidden on mobile */}
-      <div className="hidden sm:block mt-1 text-ink-light p-1">
-        <GripVertical className="h-4 w-4" />
-      </div>
+      {/* Drag handle - hidden on mobile and in read-only mode */}
+      {!readOnly && (
+        <div className="hidden sm:block mt-1 text-ink-light p-1">
+          <GripVertical className="h-4 w-4" />
+        </div>
+      )}
 
       {/* Number badge */}
       <div
