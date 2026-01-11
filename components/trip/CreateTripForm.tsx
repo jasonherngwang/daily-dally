@@ -52,7 +52,7 @@ export function CreateTripForm() {
       <div className="space-y-3">
         <Input
           type="text"
-          placeholder="Enter trip name (e.g., Japan 2026)"
+          placeholder="Enter trip name (e.g., Oahu 2026)"
           value={tripName}
           onChange={(e) => setTripName(e.target.value)}
           disabled={isLoading}
