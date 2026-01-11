@@ -179,7 +179,6 @@ export default function TripPage() {
                 activeDayId={activeDayId}
                 onDaySelect={handleDaySelect}
                 onAddDay={handleAddDay}
-                onDeleteDay={handleDeleteDay}
                 onReorderDays={handleReorderDays}
                 onRenameDay={handleRenameDay}
                 readOnly={isReadOnly}
@@ -188,6 +187,7 @@ export default function TripPage() {
                 day={activeDay}
                 trip={trip}
                 readOnly={isReadOnly}
+                onDeleteDay={handleDeleteDay}
                 onUpdate={(updatedDay) => {
                   if (isReadOnly) return;
                   const updatedDays = trip.days.map((d) =>
