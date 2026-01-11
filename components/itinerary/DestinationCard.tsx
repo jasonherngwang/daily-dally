@@ -17,6 +17,7 @@ interface DestinationCardProps {
   locationNumber?: number;
   previousDestination?: Destination;
   isActive?: boolean;
+  readOnly?: boolean;
   onUpdate: (updated: Destination) => void;
   onDelete: () => void;
 }
@@ -26,6 +27,7 @@ export function DestinationCard({
   locationNumber,
   previousDestination,
   isActive,
+  readOnly = false,
   onUpdate,
   onDelete,
 }: DestinationCardProps) {
@@ -48,7 +50,7 @@ export function DestinationCard({
     isDragging,
   } = useSortable({
     id: destination.id,
-    disabled: isEditing,
+    disabled: isEditing || readOnly,
   });
 
   const style = {
@@ -58,6 +60,7 @@ export function DestinationCard({
   };
 
   const handleSave = () => {
+    if (readOnly) return;
     if (name.trim()) {
       onUpdate({
         ...destination,
@@ -167,22 +170,26 @@ export function DestinationCard({
                     <Navigation className="h-3.5 w-3.5" />
                   </IconButton>
                 )}
-                <IconButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditing(true)}
-                  className="h-7 w-7 sm:h-8 sm:w-8"
-                >
-                  <Edit2 className="h-3.5 w-3.5" />
-                </IconButton>
-                <IconButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={onDelete}
-                  className="h-7 w-7 sm:h-8 sm:w-8"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </IconButton>
+                {!readOnly && (
+                  <>
+                    <IconButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditing(true)}
+                      className="h-7 w-7 sm:h-8 sm:w-8"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </IconButton>
+                    <IconButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={onDelete}
+                      className="h-7 w-7 sm:h-8 sm:w-8"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </IconButton>
+                  </>
+                )}
               </div>
             </div>
 

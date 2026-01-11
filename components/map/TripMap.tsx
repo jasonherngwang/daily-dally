@@ -155,6 +155,41 @@ export function TripMap({
     };
   }, []);
 
+  function requestDirections(dests: Destination[]) {
+    if (!directionsServiceRef.current || !directionsRendererRef.current) return;
+
+    const waypoints = dests.slice(1, -1).map((d) => ({
+      location: new google.maps.LatLng(d.location!.lat, d.location!.lng),
+      stopover: true,
+    }));
+
+    const origin = new google.maps.LatLng(
+      dests[0].location!.lat,
+      dests[0].location!.lng
+    );
+    const destination = new google.maps.LatLng(
+      dests[dests.length - 1].location!.lat,
+      dests[dests.length - 1].location!.lng
+    );
+
+    directionsServiceRef.current.route(
+      {
+        origin,
+        destination,
+        waypoints: waypoints.length > 0 ? waypoints : undefined,
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (
+          status === google.maps.DirectionsStatus.OK &&
+          directionsRendererRef.current
+        ) {
+          directionsRendererRef.current.setDirections(result);
+        }
+      }
+    );
+  }
+
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current) {
       return;
@@ -261,38 +296,6 @@ export function TripMap({
       marker.setIcon(icon);
     });
   }, [activeDestinationId, destinationsWithLocation]);
-
-  const requestDirections = (dests: Destination[]) => {
-    if (!directionsServiceRef.current || !directionsRendererRef.current) return;
-
-    const waypoints = dests.slice(1, -1).map((d) => ({
-      location: new google.maps.LatLng(d.location!.lat, d.location!.lng),
-      stopover: true,
-    }));
-
-    const origin = new google.maps.LatLng(
-      dests[0].location!.lat,
-      dests[0].location!.lng
-    );
-    const destination = new google.maps.LatLng(
-      dests[dests.length - 1].location!.lat,
-      dests[dests.length - 1].location!.lng
-    );
-
-    directionsServiceRef.current.route(
-      {
-        origin,
-        destination,
-        waypoints: waypoints.length > 0 ? waypoints : undefined,
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === google.maps.DirectionsStatus.OK && directionsRendererRef.current) {
-          directionsRendererRef.current.setDirections(result);
-        }
-      }
-    );
-  };
 
   if (loadError) {
     return (

@@ -36,8 +36,11 @@ export function CreateTripForm() {
         throw new Error('Failed to create trip');
       }
 
-      const trip = await response.json();
-      router.push(`/trip/${trip.id}`);
+      const data = (await response.json()) as {
+        trip: { id: string };
+        tokens: { editToken: string };
+      };
+      router.push(`/trip/${data.tokens.editToken}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setIsLoading(false);

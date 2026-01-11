@@ -32,6 +32,7 @@ interface DayTabsProps {
   onReorderDay?: (dayId: string, direction: 'left' | 'right') => void; // Keeping for compatibility, but unused
   onReorderDays?: (days: Day[]) => void;
   onRenameDay?: (dayId: string, newLabel: string) => void;
+  readOnly?: boolean;
 }
 
 // Sortable Day Tab Component
@@ -46,7 +47,8 @@ function SortableDayTab({
   onSaveEdit,
   setEditLabel,
   handleKeyDown,
-  canDelete
+  canDelete,
+  readOnly,
 }: {
   day: Day;
   activeDayId: string;
@@ -59,6 +61,7 @@ function SortableDayTab({
   setEditLabel: (val: string) => void;
   handleKeyDown: (e: React.KeyboardEvent, dayId: string) => void;
   canDelete: boolean;
+  readOnly: boolean;
 }) {
   const {
     attributes,
@@ -67,7 +70,10 @@ function SortableDayTab({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: day.id });
+  } = useSortable({
+    id: day.id,
+    disabled: readOnly || editingDayId === day.id,
+  });
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -77,6 +83,7 @@ function SortableDayTab({
 
   const isActive = day.id === activeDayId;
   const isEditing = editingDayId === day.id;
+  const isReadOnly = readOnly;
 
   if (isEditing) {
     return (
@@ -94,12 +101,14 @@ function SortableDayTab({
           onKeyDown={(e) => handleKeyDown(e, day.id)}
           className="h-6 w-20 text-xs px-2"
           autoFocus
+          disabled={isReadOnly}
         />
         <IconButton
           variant="ghost"
           size="sm"
           onClick={() => onSaveEdit(day.id)}
           className="h-6 w-6"
+          disabled={isReadOnly}
         >
           <Check className="h-3 w-3" />
         </IconButton>
@@ -135,13 +144,16 @@ function SortableDayTab({
         }}
       >
         <span
-          onDoubleClick={(e) => onStartEdit(day, e)}
-          title="Double-click to rename"
+          onDoubleClick={(e) => {
+            if (isReadOnly) return;
+            onStartEdit(day, e);
+          }}
+          title={isReadOnly ? undefined : 'Double-click to rename'}
         >
           {day.label}
         </span>
 
-        {isActive && canDelete && onDeleteDay && (
+        {!isReadOnly && isActive && canDelete && onDeleteDay && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -167,6 +179,7 @@ export function DayTabs({
   onDeleteDay,
   onReorderDays,
   onRenameDay,
+  readOnly = false,
 }: DayTabsProps) {
   const [editingDayId, setEditingDayId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
@@ -183,6 +196,7 @@ export function DayTabs({
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
+    if (readOnly) return;
     const { active, over } = event;
 
     if (over && active.id !== over.id && onReorderDays) {
@@ -193,6 +207,7 @@ export function DayTabs({
   };
 
   const handleStartEdit = (day: Day, e: React.MouseEvent) => {
+    if (readOnly) return;
     e.stopPropagation();
     setEditingDayId(day.id);
     setEditLabel(day.label);
@@ -240,20 +255,23 @@ export function DayTabs({
               setEditLabel={setEditLabel}
               handleKeyDown={handleKeyDown}
               canDelete={days.length > 1}
+              readOnly={readOnly}
             />
           ))}
         </SortableContext>
       </DndContext>
 
-      <IconButton
-        variant="ghost"
-        size="sm"
-        onClick={onAddDay}
-        className="flex-shrink-0 h-8 w-8 rounded-lg border border-border/30 hover:border-border"
-        title="Add day"
-      >
-        <Plus className="h-4 w-4" />
-      </IconButton>
+      {!readOnly && (
+        <IconButton
+          variant="ghost"
+          size="sm"
+          onClick={onAddDay}
+          className="flex-shrink-0 h-8 w-8 rounded-lg border border-border/30 hover:border-border"
+          title="Add day"
+        >
+          <Plus className="h-4 w-4" />
+        </IconButton>
+      )}
     </div>
   );
 }
