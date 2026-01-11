@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X, Check } from 'lucide-react';
+import { Plus, Check } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
 import type { Day } from '@/types/trip';
@@ -28,7 +28,6 @@ interface DayTabsProps {
   activeDayId: string;
   onDaySelect: (dayId: string) => void;
   onAddDay: () => void;
-  onDeleteDay?: (dayId: string) => void;
   onReorderDay?: (dayId: string, direction: 'left' | 'right') => void; // Keeping for compatibility, but unused
   onReorderDays?: (days: Day[]) => void;
   onRenameDay?: (dayId: string, newLabel: string) => void;
@@ -42,12 +41,10 @@ function SortableDayTab({
   editingDayId,
   editLabel,
   onDaySelect,
-  onDeleteDay,
   onStartEdit,
   onSaveEdit,
   setEditLabel,
   handleKeyDown,
-  canDelete,
   readOnly,
 }: {
   day: Day;
@@ -55,12 +52,10 @@ function SortableDayTab({
   editingDayId: string | null;
   editLabel: string;
   onDaySelect: (dayId: string) => void;
-  onDeleteDay?: (dayId: string) => void;
   onStartEdit: (day: Day, e: React.MouseEvent) => void;
   onSaveEdit: (dayId: string) => void;
   setEditLabel: (val: string) => void;
   handleKeyDown: (e: React.KeyboardEvent, dayId: string) => void;
-  canDelete: boolean;
   readOnly: boolean;
 }) {
   const {
@@ -152,20 +147,6 @@ function SortableDayTab({
         >
           {day.label}
         </span>
-
-        {!isReadOnly && isActive && canDelete && onDeleteDay && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteDay(day.id);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="p-0.5 hover:bg-white/20 rounded transition-colors ml-1"
-            title="Delete day"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        )}
       </div>
     </div>
   );
@@ -176,7 +157,6 @@ export function DayTabs({
   activeDayId,
   onDaySelect,
   onAddDay,
-  onDeleteDay,
   onReorderDays,
   onRenameDay,
   readOnly = false,
@@ -249,12 +229,10 @@ export function DayTabs({
               editingDayId={editingDayId}
               editLabel={editLabel}
               onDaySelect={onDaySelect}
-              onDeleteDay={onDeleteDay}
               onStartEdit={handleStartEdit}
               onSaveEdit={handleSaveEdit}
               setEditLabel={setEditLabel}
               handleKeyDown={handleKeyDown}
-              canDelete={days.length > 1}
               readOnly={readOnly}
             />
           ))}
