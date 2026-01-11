@@ -18,7 +18,7 @@ import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
-  horizontalListSortingStrategy,
+  rectSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -231,7 +231,7 @@ export function DayTabs({
   };
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    <div className="flex items-center gap-2 flex-wrap pb-2">
       <DndContext 
         sensors={sensors} 
         collisionDetection={closestCenter} 
@@ -239,7 +239,7 @@ export function DayTabs({
       >
         <SortableContext 
           items={days.map(d => d.id)} 
-          strategy={horizontalListSortingStrategy}
+          strategy={rectSortingStrategy}
         >
           {days.map((day) => (
             <SortableDayTab
