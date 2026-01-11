@@ -10,6 +10,7 @@ interface PlaceSearchProps {
   onPlaceSelect: (place: PlaceResult) => void;
   placeholder?: string;
   locationBias?: { lat: number; lng: number };
+  autoFocus?: boolean;
 }
 
 type AutocompleteSuggestion = google.maps.places.AutocompleteSuggestion;
@@ -18,6 +19,7 @@ export function PlaceSearch({
   onPlaceSelect,
   placeholder = 'Search for a place...',
   locationBias,
+  autoFocus = true,
 }: PlaceSearchProps) {
   const LOCATION_BIAS_RADIUS_METERS = 50_000;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -71,9 +73,10 @@ export function PlaceSearch({
     // Best-effort mobile behavior: focus immediately on mount.
     // Some mobile browsers will still block programmatic focus, but removing any async gating helps a lot.
     if (!hasApiKey) return;
+    if (!autoFocus) return;
     inputRef.current?.focus();
     inputRef.current?.select();
-  }, [hasApiKey]);
+  }, [hasApiKey, autoFocus]);
 
   useEffect(() => {
     return () => {
@@ -223,7 +226,7 @@ export function PlaceSearch({
       <div className="relative">
         <Input
           ref={inputRef}
-          autoFocus
+          autoFocus={autoFocus}
           value={value}
           onChange={(e) => {
             const next = e.target.value;

@@ -2,8 +2,12 @@
 
 # dependencies
 /node_modules
+/.npm-cache
 /.pnp
 .pnp.js
+
+# docs (excluded from commits/PRs)
+/docs
 
 # testing
 /coverage
