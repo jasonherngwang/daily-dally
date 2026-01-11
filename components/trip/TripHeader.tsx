@@ -159,7 +159,7 @@ export function TripHeader({
                 <button
                   onClick={() => handleCopy('view')}
                   disabled={!viewToken}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-parchment transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-parchment transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {copiedKey === 'view' ? (
                     <Check className="h-4 w-4 text-forest" />
@@ -177,7 +177,7 @@ export function TripHeader({
                 {!isReadOnly && (
                   <button
                     onClick={() => handleCopy('edit')}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-parchment transition-colors"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-parchment transition-colors cursor-pointer"
                   >
                     {copiedKey === 'edit' ? (
                       <Check className="h-4 w-4 text-forest" />
@@ -228,7 +228,7 @@ export function TripHeader({
                         className="flex items-center gap-2 px-4 py-2 hover:bg-parchment transition-colors"
                       >
                         <button
-                          className="flex-1 min-w-0 text-left"
+                          className="flex-1 min-w-0 text-left cursor-pointer"
                           onClick={() => {
                             setShowMenu(false);
                             router.push(`/trip/${t.token}`);
@@ -246,7 +246,7 @@ export function TripHeader({
                         </button>
 
                         <button
-                          className="p-1 rounded hover:bg-parchment-dark"
+                          className="p-1 rounded hover:bg-parchment-dark cursor-pointer"
                           title="Copy link"
                           onClick={async (e) => {
                             e.stopPropagation();
@@ -256,7 +256,7 @@ export function TripHeader({
                           <Copy className="h-4 w-4 text-ink-light" />
                         </button>
                         <button
-                          className="p-1 rounded hover:bg-parchment-dark"
+                          className="p-1 rounded hover:bg-parchment-dark cursor-pointer"
                           title="Remove"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -270,7 +270,7 @@ export function TripHeader({
                     ))}
 
                     <button
-                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-ink-light hover:bg-parchment transition-colors"
+                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-ink-light hover:bg-parchment transition-colors cursor-pointer"
                       onClick={() => {
                         clearRecentTrips();
                         setRecentTrips([]);
@@ -287,7 +287,7 @@ export function TripHeader({
                     <div className="h-px bg-border/60" />
                     <button
                       onClick={handleDelete}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-parchment transition-colors"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-parchment transition-colors cursor-pointer"
                     >
                       <Trash2 className="h-4 w-4" />
                       Delete Trip
