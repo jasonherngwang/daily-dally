@@ -11,4 +11,6 @@ You can share URLs with either edit or read-only permissions.
 
 ![Daily Dally](./screenshots/daily-dally.png)
 
-_Built as personal software for an upcoming Oahu trip._
+https://daily-dally.vercel.app/trip/01KENQZQPKY2WBW1MKC14TMGD5 (view-only)
+
+_Mostly built on my phone with Cursor Agents_
