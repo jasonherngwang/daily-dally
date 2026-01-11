@@ -92,7 +92,7 @@ export function DayEditor({
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 text-red-600 hover:text-red-700"
+            className="gap-2 text-ink-light hover:text-red-700 focus-visible:text-red-700 active:text-red-700"
             disabled={!canDeleteDay}
             onClick={() => onDeleteDay?.(day.id)}
             title={

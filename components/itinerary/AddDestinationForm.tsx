@@ -50,24 +50,24 @@ export function AddDestinationForm({ onAdd, locationBias }: AddDestinationFormPr
 
   if (mode === null) {
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Button
           variant="secondary"
           size="sm"
           onClick={() => setMode('search')}
-          className="w-full gap-2 justify-center"
+          className="w-full gap-2 justify-center min-w-0 sm:flex-1"
         >
-          <MapPin className="h-4 w-4 flex-shrink-0" />
-          <span>Search for a place</span>
+          <MapPin className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 whitespace-normal leading-tight">Search for a place</span>
         </Button>
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setMode('note')}
-          className="w-full gap-2 justify-center"
+          className="w-full gap-2 justify-center min-w-0 sm:flex-1"
         >
-          <FileText className="h-4 w-4 flex-shrink-0" />
-          <span>Add a note</span>
+          <FileText className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 whitespace-normal leading-tight">Add a note</span>
         </Button>
       </div>
     );
