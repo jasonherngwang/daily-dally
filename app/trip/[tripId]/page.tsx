@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useTrip } from '@/hooks/useTrip';
 import { TripHeader } from '@/components/trip/TripHeader';
@@ -15,51 +15,34 @@ export default function TripPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tripId = params.tripId as string;
+  const tripToken = params.tripId as string;
 
-  const { trip, isLoading, error, updateTrip } = useTrip(tripId);
-  const [activeDayId, setActiveDayId] = useState<string | null>(null);
-  const lastDayParamRef = useRef<string | null>(null);
+  const { trip, isLoading, error, updateTrip, accessRole, tokens, isReadOnly } =
+    useTrip(tripToken);
+  const activeDayIndex = useMemo(() => {
+    if (!trip || trip.days.length === 0) return 0;
+    const dayParam = searchParams.get('day');
+    if (!dayParam) return 0;
+    const parsed = Number.parseInt(dayParam, 10);
+    if (!Number.isFinite(parsed)) return 0;
+    if (parsed < 0) return 0;
+    if (parsed >= trip.days.length) return trip.days.length - 1;
+    return parsed;
+  }, [trip, searchParams]);
 
-  useEffect(() => {
-    if (trip && trip.days.length > 0) {
-      const dayParam = searchParams.get('day');
-      const dayParamChanged = dayParam !== lastDayParamRef.current;
-      lastDayParamRef.current = dayParam;
-
-      const activeDayStillExists = activeDayId
-        ? trip.days.some((d) => d.id === activeDayId)
-        : false;
-
-      if (dayParam) {
-        const dayIndex = parseInt(dayParam, 10);
-        if (dayIndex >= 0 && dayIndex < trip.days.length) {
-          const dayFromUrl = trip.days[dayIndex].id;
-          // Only sync from URL when the URL actually changed (e.g. back/forward navigation),
-          // or when the current active day no longer exists (e.g. deleted).
-          if ((!activeDayStillExists && activeDayId !== dayFromUrl) || (dayParamChanged && activeDayId !== dayFromUrl)) {
-            setActiveDayId(dayFromUrl);
-          }
-          return;
-        }
-      }
-      if (!activeDayStillExists) {
-        setActiveDayId(trip.days[0].id);
-      }
-    }
-  }, [trip, searchParams, activeDayId]);
+  const activeDay = trip?.days?.[activeDayIndex];
+  const activeDayId = activeDay?.id || '';
 
   const handleDaySelect = (dayId: string) => {
     if (!trip) return;
     const dayIndex = trip.days.findIndex((d) => d.id === dayId);
     if (dayIndex !== -1) {
-      setActiveDayId(dayId);
-      router.push(`/trip/${tripId}?day=${dayIndex}`, { scroll: false });
+      router.push(`/trip/${tripToken}?day=${dayIndex}`, { scroll: false });
     }
   };
 
   const handleAddDay = async () => {
-    if (!trip) return;
+    if (!trip || isReadOnly) return;
 
     const newDay: Day = {
       id: generateId(),
@@ -72,12 +55,11 @@ export default function TripPage() {
       days: [...trip.days, newDay],
     });
 
-    setActiveDayId(newDay.id);
-    router.push(`/trip/${tripId}?day=${trip.days.length}`, { scroll: false });
+    router.push(`/trip/${tripToken}?day=${trip.days.length}`, { scroll: false });
   };
 
   const handleDeleteDay = async (dayId: string) => {
-    if (!trip || trip.days.length <= 1) return;
+    if (!trip || isReadOnly || trip.days.length <= 1) return;
 
     const dayIndex = trip.days.findIndex((d) => d.id === dayId);
     const newDays = trip.days.filter((d) => d.id !== dayId);
@@ -89,13 +71,12 @@ export default function TripPage() {
 
     if (activeDayId === dayId) {
       const newIndex = Math.min(dayIndex, newDays.length - 1);
-      setActiveDayId(newDays[newIndex].id);
-      router.push(`/trip/${tripId}?day=${newIndex}`, { scroll: false });
+      router.push(`/trip/${tripToken}?day=${newIndex}`, { scroll: false });
     }
   };
 
   const handleReorderDay = async (dayId: string, direction: 'left' | 'right') => {
-    if (!trip) return;
+    if (!trip || isReadOnly) return;
 
     const dayIndex = trip.days.findIndex((d) => d.id === dayId);
     if (dayIndex === -1) return;
@@ -111,27 +92,27 @@ export default function TripPage() {
       days: newDays,
     });
 
-    router.push(`/trip/${tripId}?day=${newIndex}`, { scroll: false });
+    router.push(`/trip/${tripToken}?day=${newIndex}`, { scroll: false });
   };
 
   const handleReorderDays = async (newDays: Day[]) => {
-    if (!trip) return;
+    if (!trip || isReadOnly) return;
 
     // Find the new index of the active day to keep it selected/in view
-    const activeDayIndex = newDays.findIndex((d) => d.id === activeDayId);
+    const newActiveDayIndex = newDays.findIndex((d) => d.id === activeDayId);
     
     await updateTrip({
       ...trip,
       days: newDays,
     });
 
-    if (activeDayIndex !== -1) {
-       router.push(`/trip/${tripId}?day=${activeDayIndex}`, { scroll: false });
+    if (newActiveDayIndex !== -1) {
+       router.push(`/trip/${tripToken}?day=${newActiveDayIndex}`, { scroll: false });
     }
   };
 
   const handleRenameDay = async (dayId: string, newLabel: string) => {
-    if (!trip) return;
+    if (!trip || isReadOnly) return;
 
     const newDays = trip.days.map((d) =>
       d.id === dayId ? { ...d, label: newLabel } : d
@@ -144,8 +125,9 @@ export default function TripPage() {
   };
 
   const handleDeleteTrip = async () => {
+    if (isReadOnly) return;
     try {
-      const response = await fetch(`/api/trips/${tripId}`, {
+      const response = await fetch(`/api/trips/${tripToken}`, {
         method: 'DELETE',
       });
 
@@ -175,12 +157,17 @@ export default function TripPage() {
     );
   }
 
-  const activeDay = trip.days.find((d) => d.id === activeDayId);
-
   return (
     <div className="min-h-screen bg-parchment topo-pattern">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-        <TripHeader trip={trip} onUpdate={updateTrip} onDelete={handleDeleteTrip} />
+        <TripHeader
+          trip={trip}
+          accessRole={accessRole}
+          tokens={tokens}
+          tripToken={tripToken}
+          onUpdate={updateTrip}
+          onDelete={handleDeleteTrip}
+        />
       </div>
 
       {activeDay && (
@@ -189,17 +176,20 @@ export default function TripPage() {
             <div className="space-y-4 min-w-0">
               <DayTabs
                 days={trip.days}
-                activeDayId={activeDayId || ''}
+                activeDayId={activeDayId}
                 onDaySelect={handleDaySelect}
                 onAddDay={handleAddDay}
                 onDeleteDay={handleDeleteDay}
                 onReorderDays={handleReorderDays}
                 onRenameDay={handleRenameDay}
+                readOnly={isReadOnly}
               />
               <DayEditor
                 day={activeDay}
                 trip={trip}
+                readOnly={isReadOnly}
                 onUpdate={(updatedDay) => {
+                  if (isReadOnly) return;
                   const updatedDays = trip.days.map((d) =>
                     d.id === updatedDay.id ? updatedDay : d
                   );

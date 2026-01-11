@@ -18,16 +18,15 @@ export function PlaceSearch({
 }: PlaceSearchProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const autocompleteRef = useRef<google.maps.places.PlaceAutocompleteElement | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const hasApiKey = !!apiKey?.trim();
+  const [isLoading, setIsLoading] = useState(hasApiKey);
+  const [loadError, setLoadError] = useState<string | null>(
+    hasApiKey ? null : 'Google Maps API key not configured'
+  );
 
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!apiKey?.trim()) {
-      setLoadError('Google Maps API key not configured');
-      setIsLoading(false);
-      return;
-    }
+    if (!hasApiKey) return;
 
     const initGoogleMaps = async () => {
       try {
@@ -125,7 +124,7 @@ export function PlaceSearch({
         autocompleteRef.current = null;
       }
     };
-  }, [onPlaceSelect, placeholder, locationBias]);
+  }, [onPlaceSelect, placeholder, locationBias, hasApiKey]);
 
   return (
     <div className="relative">
