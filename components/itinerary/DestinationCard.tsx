@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { GripVertical, Edit2, Trash2, Navigation } from 'lucide-react';
+import { GripVertical, Edit2, Trash2, Navigation, FileText } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card } from '@/components/ui/Card';
@@ -100,7 +100,11 @@ export function DestinationCard({
           ${hasLocation ? 'bg-terracotta text-white shadow-sm' : 'bg-border/60 text-ink-light'}
         `}
       >
-        {hasLocation ? locationNumber : ''}
+        {hasLocation ? (
+          locationNumber
+        ) : (
+          <FileText className="h-3.5 w-3.5" aria-label="Note" />
+        )}
       </div>
 
       <div className="flex-1 min-w-0">
