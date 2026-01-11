@@ -121,10 +121,10 @@ export function DestinationCard({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Destination name"
-              className="font-semibold text-sm h-9"
+              className="font-semibold text-base h-9"
             />
             {destination.address && (
-              <p className="text-xs text-ink-light truncate">{destination.address}</p>
+              <p className="text-xs text-ink break-words">{destination.address}</p>
             )}
             <Textarea
               value={notes}
@@ -146,10 +146,15 @@ export function DestinationCard({
           <>
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-ink text-sm leading-tight">{destination.name}</h3>
+                <h3 className="font-semibold text-ink text-base leading-tight break-words">{destination.name}</h3>
                 {destination.address && (
-                  <p className="mt-0.5 text-xs text-ink-light truncate sm:whitespace-normal sm:line-clamp-2">
+                  <p className="mt-0.5 text-xs text-ink break-words">
                     {destination.address}
+                  </p>
+                )}
+                {destination.notes && !destination.address && (
+                  <p className="mt-1 text-xs text-ink whitespace-pre-wrap leading-relaxed break-words">
+                    {destination.notes}
                   </p>
                 )}
               </div>
@@ -176,7 +181,8 @@ export function DestinationCard({
                       variant="ghost"
                       size="sm"
                       onClick={() => setIsEditing(true)}
-                      className="h-7 w-7 sm:h-8 sm:w-8"
+                      className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-terracotta/10"
+                      title="Edit destination"
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                     </IconButton>
@@ -184,18 +190,19 @@ export function DestinationCard({
                       variant="ghost"
                       size="sm"
                       onClick={onDelete}
-                      className="h-7 w-7 sm:h-8 sm:w-8"
+                      className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-terracotta/10 group"
+                      title="Delete destination"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5 group-hover:text-red-600" />
                     </IconButton>
                   </>
                 )}
               </div>
             </div>
 
-            {destination.notes && (
-              <div className="mt-2 pt-2 border-t border-border/30">
-                <p className="text-xs text-ink-light whitespace-pre-wrap leading-relaxed">
+            {destination.notes && destination.address && (
+              <div className="mt-2 pt-2 border-t border-border/80">
+                <p className="text-xs text-ink whitespace-pre-wrap leading-relaxed break-words">
                   {destination.notes}
                 </p>
               </div>
@@ -206,10 +213,10 @@ export function DestinationCard({
                 onClick={() => window.open(directionsUrl, '_blank')}
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
-                className="mt-2 text-xs text-forest hover:text-forest-light flex items-center gap-1.5 transition-colors"
+                className="mt-2 text-xs text-forest hover:text-forest-light flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Navigation className="h-3 w-3" />
-                <span>Directions from {previousDestination?.name || 'previous'}</span>
+                <span>from {previousDestination?.name || 'previous'}</span>
               </button>
             )}
           </>

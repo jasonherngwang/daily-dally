@@ -198,7 +198,7 @@ export default function TripPage() {
               />
             </div>
 
-            <div className="h-[400px] sm:h-[500px] lg:h-[calc(100vh-120px)] lg:sticky lg:top-4">
+            <div className="h-[400px] sm:h-[500px] lg:h-[calc(100vh-120px)] lg:sticky lg:top-0">
               <TripMap
                 key={activeDayId}
                 destinations={activeDay.destinations}
