@@ -56,6 +56,10 @@ export function DestinationList({
   };
 
   const validDestinations = destinations.filter((d) => d.id);
+  const hasValidLocation = (d: Destination) =>
+    d.location != null &&
+    Number.isFinite(d.location.lat) &&
+    Number.isFinite(d.location.lng);
   
   if (validDestinations.length === 0) {
     return (
@@ -64,6 +68,19 @@ export function DestinationList({
       </div>
     );
   }
+
+  // Only destinations with locations get numbers (and participate in "previous destination" for directions).
+  let locationCounter = 0;
+  let lastLocationDestination: Destination | undefined;
+  const renderItems = validDestinations.map((destination) => {
+    const isLocation = hasValidLocation(destination);
+    const locationNumber = isLocation ? ++locationCounter : undefined;
+    const previousDestination = isLocation ? lastLocationDestination : undefined;
+    if (isLocation) {
+      lastLocationDestination = destination;
+    }
+    return { destination, locationNumber, previousDestination };
+  });
 
   return (
     <DndContext
@@ -76,9 +93,8 @@ export function DestinationList({
         strategy={verticalListSortingStrategy}
       >
         <div className="flex flex-col">
-          {validDestinations.map((destination, index) => {
+          {renderItems.map(({ destination, locationNumber, previousDestination }, index) => {
             const originalIndex = destinations.findIndex((d) => d.id === destination.id);
-            const previousDestination = index > 0 ? validDestinations[index - 1] : undefined;
             const isLast = index === validDestinations.length - 1;
             return (
               <div 
@@ -87,7 +103,7 @@ export function DestinationList({
               >
                 <DestinationCard
                   destination={destination}
-                  index={index}
+                  locationNumber={locationNumber}
                   previousDestination={previousDestination}
                   isActive={destination.id === activeDestinationId}
                   onUpdate={(updated) => onUpdate(originalIndex, updated)}

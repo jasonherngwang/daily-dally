@@ -14,7 +14,7 @@ import type { Destination } from '@/types/trip';
 
 interface DestinationCardProps {
   destination: Destination;
-  index: number;
+  locationNumber?: number;
   previousDestination?: Destination;
   isActive?: boolean;
   onUpdate: (updated: Destination) => void;
@@ -23,7 +23,7 @@ interface DestinationCardProps {
 
 export function DestinationCard({
   destination,
-  index,
+  locationNumber,
   previousDestination,
   isActive,
   onUpdate,
@@ -100,7 +100,7 @@ export function DestinationCard({
           ${hasLocation ? 'bg-terracotta text-white shadow-sm' : 'bg-border/60 text-ink-light'}
         `}
       >
-        {index + 1}
+        {hasLocation ? locationNumber : ''}
       </div>
 
       <div className="flex-1 min-w-0">
