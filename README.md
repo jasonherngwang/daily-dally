@@ -1,7 +1,14 @@
 # Daily Dally
 
-An app for how I like to plan trips.
+A travel app where each day is a list of destinations with driving directions on a map.
 
-For each day of the trip, add destinations and attractions, and get driving directions on a map.
+Days are displayed horizontally as tabs. Days and Destinations can be dragged and dropped to re-order.
 
-No auth; each trip is a JSONs in Upstash Redis, with shareable URL.
+You can add Notes, which are Destinations without an address and won't appear on the map.
+
+You can share URLs with either edit or read-only permissions.
+
+
+![Daily Dally](./screenshots/daily-dally.png)
+
+_Built as personal software for an upcoming Oahu trip._
