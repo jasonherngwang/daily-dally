@@ -16,9 +16,10 @@ export function TripMap({
   activeDestinationId,
   onDestinationClick,
 }: TripMapProps) {
+  const mapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID?.trim() || null;
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const markersRef = useRef<(google.maps.marker.AdvancedMarkerElement | google.maps.Marker)[]>([]);
   const directionsServiceRef = useRef<google.maps.DirectionsService | null>(null);
   const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,10 +71,12 @@ export function TripMap({
         if (!mapRef.current) return;
 
         if (!mapInstanceRef.current) {
+          // Advanced markers require a valid `mapId`. When present, we prefer Cloud-based map styling.
+          // If you don't have a mapId configured, we fall back to legacy markers (and legacy JS styling).
           const map = new Map(mapRef.current, {
             zoom: 2,
             center: { lat: 37.7749, lng: -122.4194 },
-            styles: getMapStyles(),
+            ...(mapId ? { mapId } : { styles: getMapStyles() }),
             disableDefaultUI: false,
             zoomControl: true,
             mapTypeControl: false,
@@ -107,7 +110,13 @@ export function TripMap({
 
     return () => {
       if (mapInstanceRef.current) {
-        markersRef.current.forEach((marker) => marker.setMap(null));
+        markersRef.current.forEach((marker) => {
+          if (isLegacyMarker(marker)) {
+            marker.setMap(null);
+          } else {
+            marker.map = null;
+          }
+        });
         markersRef.current = [];
         if (directionsRendererRef.current) {
           directionsRendererRef.current.setMap(null);
@@ -128,10 +137,9 @@ export function TripMap({
             if (markersRef.current.length > 0) {
               const bounds = new google.maps.LatLngBounds();
               markersRef.current.forEach((marker) => {
-                const position = marker.getPosition();
-                if (position) {
-                  bounds.extend(position);
-                }
+                const pos = getMarkerPosition(marker);
+                if (!pos) return;
+                bounds.extend(pos);
               });
               mapInstanceRef.current.fitBounds(bounds, 50);
             }
@@ -205,7 +213,13 @@ export function TripMap({
       }, 100);
 
       if (destinationsWithLocation.length === 0) {
-        markersRef.current.forEach((marker) => marker.setMap(null));
+        markersRef.current.forEach((marker) => {
+          if (isLegacyMarker(marker)) {
+            marker.setMap(null);
+          } else {
+            marker.map = null;
+          }
+        });
         markersRef.current = [];
         if (directionsRendererRef.current) {
           directionsRendererRef.current.setMap(null);
@@ -225,10 +239,13 @@ export function TripMap({
 
       destinationsKeyRef.current = currentKey;
 
-      const markerLibrary = await importLibrary('marker');
-      const { Marker } = markerLibrary;
-
-      markersRef.current.forEach((marker) => marker.setMap(null));
+      markersRef.current.forEach((marker) => {
+        if (isLegacyMarker(marker)) {
+          marker.setMap(null);
+        } else {
+          marker.map = null;
+        }
+      });
       markersRef.current = [];
 
       if (directionsRendererRef.current && mapInstanceRef.current) {
@@ -236,29 +253,54 @@ export function TripMap({
         directionsRendererRef.current.setMap(mapInstanceRef.current);
       }
 
-      const markers: google.maps.Marker[] = [];
+      const markers: (google.maps.marker.AdvancedMarkerElement | google.maps.Marker)[] = [];
+      const advanced =
+        mapId
+          ? ((await importLibrary('marker')) as unknown as {
+              AdvancedMarkerElement: typeof google.maps.marker.AdvancedMarkerElement;
+            })
+          : null;
+
       destinationsWithLocation.forEach((destination, index) => {
         if (!destination.location) return;
 
-        const marker = new Marker({
-          position: {
-            lat: destination.location.lat,
-            lng: destination.location.lng,
-          },
-          map: mapInstanceRef.current!,
-          title: destination.name,
-          icon: createCustomMarkerIcon(index + 1, destination.id === activeDestinationId),
-          label: {
-            text: String(index + 1),
-            color: 'white',
-            fontSize: '14px',
-            fontWeight: 'bold',
-          },
-        });
+        const isActive = destination.id === activeDestinationId;
+        const position = { lat: destination.location.lat, lng: destination.location.lng };
 
-        marker.addListener('click', () => {
-          handleDestinationClick(destination.id);
-        });
+        let marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker;
+
+        if (advanced) {
+          marker = new advanced.AdvancedMarkerElement({
+            position,
+            map: mapInstanceRef.current!,
+            title: destination.name,
+            content: createCustomMarkerContent(index + 1, isActive),
+          });
+
+          // Advanced markers fire `gmp-click` instead of `click`.
+          marker.addListener('gmp-click', () => {
+            handleDestinationClick(destination.id);
+          });
+        } else {
+          // Fallback: keep the app working even without a Map ID.
+          // (This will still show the deprecation warning until a Map ID is configured.)
+          marker = new google.maps.Marker({
+            position,
+            map: mapInstanceRef.current!,
+            title: destination.name,
+            icon: createCustomMarkerIcon(index + 1, isActive),
+            label: {
+              text: String(index + 1),
+              color: 'white',
+              fontSize: '14px',
+              fontWeight: 'bold',
+            },
+          });
+
+          marker.addListener('click', () => {
+            handleDestinationClick(destination.id);
+          });
+        }
 
         markers.push(marker);
       });
@@ -268,10 +310,9 @@ export function TripMap({
       if (markers.length > 0) {
         const bounds = new google.maps.LatLngBounds();
         markers.forEach((marker) => {
-          const position = marker.getPosition();
-          if (position) {
-            bounds.extend(position);
-          }
+          const pos = getMarkerPosition(marker);
+          if (!pos) return;
+          bounds.extend(pos);
         });
         mapInstanceRef.current.fitBounds(bounds, 50);
       }
@@ -292,8 +333,11 @@ export function TripMap({
       if (!destination) return;
 
       const isActive = destination.id === activeDestinationId;
-      const icon = createCustomMarkerIcon(index + 1, isActive);
-      marker.setIcon(icon);
+      if (isLegacyMarker(marker)) {
+        marker.setIcon(createCustomMarkerIcon(index + 1, isActive));
+      } else {
+        marker.content = createCustomMarkerContent(index + 1, isActive);
+      }
     });
   }, [activeDestinationId, destinationsWithLocation]);
 
@@ -329,10 +373,27 @@ export function TripMap({
   );
 }
 
-function createCustomMarkerIcon(
+function createCustomMarkerContent(
   number: number,
   isActive: boolean
-): google.maps.Icon {
+): HTMLElement {
+  const size = isActive ? 40 : 36;
+  const color = '#C4704B';
+
+  const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="${color}" stroke="white" stroke-width="2"/>
+    <text x="${size / 2}" y="${size / 2}" text-anchor="middle" dominant-baseline="central" fill="white" font-size="14" font-weight="bold">${number}</text>
+  </svg>`;
+
+  const wrapper = document.createElement('div');
+  wrapper.style.width = `${size}px`;
+  wrapper.style.height = `${size}px`;
+  wrapper.style.transform = 'translate(-50%, -50%)';
+  wrapper.innerHTML = svg;
+  return wrapper;
+}
+
+function createCustomMarkerIcon(number: number, isActive: boolean): google.maps.Icon {
   const size = isActive ? 40 : 36;
   const color = '#C4704B';
 
@@ -348,6 +409,26 @@ function createCustomMarkerIcon(
     scaledSize: new google.maps.Size(size, size),
     anchor: new google.maps.Point(size / 2, size / 2),
   };
+}
+
+function isLegacyMarker(
+  marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker
+): marker is google.maps.Marker {
+  return typeof (marker as google.maps.Marker).getPosition === 'function';
+}
+
+function getMarkerPosition(
+  marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker
+): google.maps.LatLng | null {
+  if (isLegacyMarker(marker)) {
+    return marker.getPosition() ?? null;
+  }
+  const pos = marker.position;
+  if (!pos) return null;
+  if (typeof (pos as google.maps.LatLng).lat === 'function') {
+    return pos as google.maps.LatLng;
+  }
+  return new google.maps.LatLng((pos as google.maps.LatLngLiteral).lat, (pos as google.maps.LatLngLiteral).lng);
 }
 
 function getMapStyles(): google.maps.MapTypeStyle[] {
