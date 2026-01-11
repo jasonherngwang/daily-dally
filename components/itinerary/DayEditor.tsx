@@ -26,32 +26,6 @@ export function DayEditor({ day, trip, onUpdate }: DayEditorProps) {
 
   return (
     <div className="space-y-4 min-w-0">
-      <div>
-        {isEditingLabel ? (
-          <Input
-            value={dayLabel}
-            onChange={(e) => setDayLabel(e.target.value)}
-            onBlur={handleLabelSave}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleLabelSave();
-              if (e.key === 'Escape') {
-                setDayLabel(day.label);
-                setIsEditingLabel(false);
-              }
-            }}
-            className="text-xl sm:text-2xl font-display font-semibold h-12"
-            autoFocus
-          />
-        ) : (
-          <h2
-            className="text-xl sm:text-2xl font-display font-semibold text-ink cursor-pointer hover:text-ink-light transition-colors leading-tight"
-            onClick={() => setIsEditingLabel(true)}
-          >
-            {day.label}
-          </h2>
-        )}
-      </div>
-
       <AddDestinationForm
         locationBias={
           day.destinations.length > 0
