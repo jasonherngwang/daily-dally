@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { DestinationList } from './DestinationList';
 import { AddDestinationForm } from './AddDestinationForm';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { IconButton } from '@/components/ui/IconButton';
 import { generateId } from '@/lib/ulid';
 import type { Day, Trip } from '@/types/trip';
 
@@ -12,6 +15,7 @@ interface DayEditorProps {
   trip: Trip;
   onUpdate: (day: Day) => void;
   onDeleteDay?: (dayId: string) => void;
+  onRenameDay?: (dayId: string, newLabel: string) => void;
   readOnly?: boolean;
 }
 
@@ -20,16 +24,68 @@ export function DayEditor({
   trip,
   onUpdate,
   onDeleteDay,
+  onRenameDay,
   readOnly = false,
 }: DayEditorProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editLabel, setEditLabel] = useState('');
   const canDeleteDay = !readOnly && trip.days.length > 1 && !!onDeleteDay;
+
+  const handleStartEdit = () => {
+    if (readOnly) return;
+    setIsEditing(true);
+    setEditLabel(day.label);
+  };
+
+  const handleSaveEdit = () => {
+    if (editLabel.trim() && onRenameDay) {
+      onRenameDay(day.id, editLabel.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setEditLabel(day.label);
+    }
+  };
 
   return (
     <div className="space-y-4 min-w-0">
       <div className="flex items-center justify-between gap-3 min-w-0">
-        <div className="min-w-0">
-          <div className="text-xs text-ink-light">Day</div>
-          <div className="font-semibold text-ink truncate">{day.label}</div>
+        <div className="min-w-0 flex-1">
+          {isEditing ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={editLabel}
+                onChange={(e) => setEditLabel(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="h-8 text-sm font-semibold"
+                autoFocus
+                disabled={readOnly}
+              />
+              <IconButton
+                variant="ghost"
+                size="sm"
+                onClick={handleSaveEdit}
+                className="h-8 w-8"
+                disabled={readOnly}
+              >
+                <Check className="h-4 w-4" />
+              </IconButton>
+            </div>
+          ) : (
+            <div
+              className="font-semibold text-ink truncate cursor-pointer hover:text-forest transition-colors"
+              onClick={handleStartEdit}
+              title={readOnly ? undefined : 'Click to rename'}
+            >
+              {day.label}
+            </div>
+          )}
         </div>
 
         {!readOnly && (
