@@ -195,7 +195,7 @@ export function DestinationCard({
 
             {destination.notes && (
               <div className="mt-2 pt-2 border-t border-border/30">
-                <p className="text-xs text-ink-light whitespace-pre-wrap leading-relaxed bg-parchment/50 rounded-md px-2.5 py-2">
+                <p className="text-xs text-ink-light whitespace-pre-wrap leading-relaxed">
                   {destination.notes}
                 </p>
               </div>
