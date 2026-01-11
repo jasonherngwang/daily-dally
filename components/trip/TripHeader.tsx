@@ -1,11 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { Copy, Check, MoreVertical, Trash2, Eye, Pencil } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  Check,
+  Copy,
+  Eye,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Badge } from '@/components/ui/Badge';
 import type { Trip } from '@/types/trip';
+import { clearRecentTrips, getRecentTrips, removeRecentTrip, type RecentTrip } from '@/lib/recents';
 
 interface TripHeaderProps {
   trip: Trip;
@@ -27,15 +37,32 @@ export function TripHeader({
   onUpdate,
   onDelete,
 }: TripHeaderProps) {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [tripName, setTripName] = useState(trip.name);
   const [copiedKey, setCopiedKey] = useState<'view' | 'edit' | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [recentTrips, setRecentTrips] = useState<RecentTrip[]>(() => getRecentTrips());
 
   const isReadOnly = accessRole !== 'edit';
   const viewToken = tokens?.viewToken;
   const editToken = tokens?.editToken || tripToken;
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key && e.key.startsWith('dailyDally.recentTrips')) {
+        setRecentTrips(getRecentTrips());
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  const menuRecents = useMemo(
+    () => recentTrips.filter((t) => t.token !== tripToken).slice(0, 8),
+    [recentTrips, tripToken]
+  );
 
   const handleSave = () => {
     if (isReadOnly) return;
@@ -60,6 +87,11 @@ export function TripHeader({
       onDelete();
     }
     setShowMenu(false);
+  };
+
+  const handleCopyTripLink = async (token: string) => {
+    const url = `${window.location.origin}/trip/${token}`;
+    await navigator.clipboard.writeText(url);
   };
 
   return (
@@ -165,36 +197,107 @@ export function TripHeader({
           )}
         </div>
 
-        {!isReadOnly && (
-          <div className="relative">
-            <IconButton
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowMenu(!showMenu)}
-              className="h-8 w-8"
-            >
-              <MoreVertical className="h-4 w-4" />
-            </IconButton>
+        <div className="relative">
+          <IconButton
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowMenu(!showMenu)}
+            className="h-8 w-8"
+            title="Menu"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </IconButton>
 
-            {showMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowMenu(false)}
-                />
-                <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-border bg-parchment-dark card-elevated z-20 overflow-hidden">
-                  <button
-                    onClick={handleDelete}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-parchment transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete Trip
-                  </button>
+          {showMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
+              <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-parchment-dark card-elevated z-20 overflow-hidden">
+                <div className="px-4 pt-3 pb-2 text-xs font-semibold text-ink-light uppercase tracking-wide">
+                  Recent trips
                 </div>
-              </>
-            )}
-          </div>
-        )}
+
+                {menuRecents.length === 0 ? (
+                  <div className="px-4 pb-3 text-sm text-ink-light">
+                    No recent trips yet.
+                  </div>
+                ) : (
+                  <div className="pb-1">
+                    {menuRecents.map((t) => (
+                      <div
+                        key={t.token}
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-parchment transition-colors"
+                      >
+                        <button
+                          className="flex-1 min-w-0 text-left"
+                          onClick={() => {
+                            setShowMenu(false);
+                            router.push(`/trip/${t.token}`);
+                          }}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="text-sm text-ink truncate">{t.name}</div>
+                            <Badge variant={t.accessRole === 'edit' ? 'success' : 'default'}>
+                              {t.accessRole === 'edit' ? 'Editable' : 'View'}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-ink-light truncate">
+                            Last opened {new Date(t.lastOpenedAt).toLocaleString()}
+                          </div>
+                        </button>
+
+                        <button
+                          className="p-1 rounded hover:bg-parchment-dark"
+                          title="Copy link"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await handleCopyTripLink(t.token);
+                          }}
+                        >
+                          <Copy className="h-4 w-4 text-ink-light" />
+                        </button>
+                        <button
+                          className="p-1 rounded hover:bg-parchment-dark"
+                          title="Remove"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeRecentTrip(t.token);
+                            setRecentTrips(getRecentTrips());
+                          }}
+                        >
+                          <X className="h-4 w-4 text-ink-light" />
+                        </button>
+                      </div>
+                    ))}
+
+                    <button
+                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-ink-light hover:bg-parchment transition-colors"
+                      onClick={() => {
+                        clearRecentTrips();
+                        setRecentTrips([]);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Clear recents
+                    </button>
+                  </div>
+                )}
+
+                {!isReadOnly && (
+                  <>
+                    <div className="h-px bg-border/60" />
+                    <button
+                      onClick={handleDelete}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-parchment transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete Trip
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
