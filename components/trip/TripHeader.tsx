@@ -43,6 +43,7 @@ export function TripHeader({
   const [copiedKey, setCopiedKey] = useState<'view' | 'edit' | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
   const [recentTrips, setRecentTrips] = useState<RecentTrip[]>(() => getRecentTrips());
 
   const isReadOnly = accessRole !== 'edit';
@@ -94,6 +95,33 @@ export function TripHeader({
     await navigator.clipboard.writeText(url);
   };
 
+  const handleCloneTrip = async () => {
+    if (isCloning) return;
+    setIsCloning(true);
+    try {
+      const response = await fetch(`/api/trips/${tripToken}/clone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) throw new Error('Failed to clone trip');
+
+      const data = (await response.json()) as {
+        tokens?: { editToken?: string };
+      };
+      const editToken = data.tokens?.editToken;
+      if (!editToken) throw new Error('Clone succeeded but no edit token returned');
+
+      window.open(`/trip/${editToken}`, '_blank', 'noopener,noreferrer');
+      setShowMenu(false);
+    } catch (e) {
+      console.error(e);
+      alert('Could not clone this trip. Please try again.');
+    } finally {
+      setIsCloning(false);
+    }
+  };
+
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-4">
       <div className="flex-1 min-w-0">
@@ -137,7 +165,7 @@ export function TripHeader({
         )}
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
         <div className="relative">
           <Button
             variant="ghost"
@@ -155,7 +183,7 @@ export function TripHeader({
                 className="fixed inset-0 z-10"
                 onClick={() => setShowShare(false)}
               />
-              <div className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-border bg-parchment-dark card-elevated z-20 overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-border bg-parchment-mid card-elevated z-20 overflow-hidden">
                 <button
                   onClick={() => handleCopy('view')}
                   disabled={!viewToken}
@@ -211,7 +239,7 @@ export function TripHeader({
           {showMenu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-parchment-dark card-elevated z-20 overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-parchment-mid card-elevated z-20 overflow-hidden">
                 <div className="px-4 pt-3 pb-2 text-xs font-semibold text-ink-light uppercase tracking-wide">
                   Recent trips
                 </div>
@@ -246,7 +274,7 @@ export function TripHeader({
                         </button>
 
                         <button
-                          className="p-1 rounded hover:bg-parchment-dark cursor-pointer"
+                          className="p-1 rounded hover:bg-parchment-mid cursor-pointer"
                           title="Copy link"
                           onClick={async (e) => {
                             e.stopPropagation();
@@ -256,7 +284,7 @@ export function TripHeader({
                           <Copy className="h-4 w-4 text-ink-light" />
                         </button>
                         <button
-                          className="p-1 rounded hover:bg-parchment-dark cursor-pointer"
+                          className="p-1 rounded hover:bg-parchment-mid cursor-pointer"
                           title="Remove"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -281,6 +309,16 @@ export function TripHeader({
                     </button>
                   </div>
                 )}
+
+                <div className="h-px bg-border/60" />
+                <button
+                  onClick={handleCloneTrip}
+                  disabled={isCloning}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-ink hover:bg-parchment transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Copy className="h-4 w-4" />
+                  {isCloning ? 'Cloning…' : 'Clone trip'}
+                </button>
 
                 {!isReadOnly && (
                   <>
