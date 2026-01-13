@@ -17,6 +17,11 @@ export interface DiscoverSuggestion {
   detourKm: number;
   insertAfterDestinationId: string;
   whyItFits: string;
+  sources?: Array<{ title: string; url: string; snippet?: string }>;
+  sourceKind?: 'places' | 'web' | 'both';
+  openState?: string;
+  hoursSummary?: string;
+  placementText?: string;
 }
 
 interface DiscoverResponse {
@@ -217,24 +222,49 @@ export function DiscoverPanel({
           )}
 
           <div className="space-y-2">
-            {suggestions.map((s) => (
-              <div
-                key={s.candidateId}
-                className="relative rounded-xl border border-border/50 bg-parchment-mid p-3"
-                onMouseEnter={() => onPreviewLocationChange?.(s.location)}
-                onMouseLeave={() => onPreviewLocationChange?.(null)}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 pr-2">
-                    <h3 className="font-display font-semibold text-ink text-base leading-tight break-words">
-                      {s.name}
-                    </h3>
-                    <div className="mt-0.5 text-xs text-ink-light">
-                      {s.address}
-                    </div>
+            {suggestions.map((s) => {
+              const src0 = s.sources?.[0];
+              const srcUrl = src0?.url;
+              const srcTitle = src0?.snippet || src0?.title;
+              return (
+                <div
+                  key={s.candidateId}
+                  className="relative rounded-xl border border-border/50 bg-parchment-mid p-3"
+                  onMouseEnter={() => onPreviewLocationChange?.(s.location)}
+                  onMouseLeave={() => onPreviewLocationChange?.(null)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 pr-2">
+                      <h3 className="font-display font-semibold text-ink text-base leading-tight break-words">
+                        {s.name}
+                      </h3>
+                      <div className="mt-0.5 text-xs text-ink-light">
+                        {s.address}
+                      </div>
+                      {srcUrl && (
+                        <a
+                          href={srcUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 block text-xs text-ink-light underline decoration-ink-light/40 hover:decoration-ink-light"
+                          title={srcTitle}
+                        >
+                          {srcUrl}
+                        </a>
+                      )}
+                    {(s.openState || s.hoursSummary) && (
+                      <div className="mt-0.5 text-xs text-ink-light">
+                        {[s.openState, s.hoursSummary].filter(Boolean).join(' • ')}
+                      </div>
+                    )}
                     {s.whyItFits && (
                       <div className="mt-1.5 text-sm text-ink-light">
                         {s.whyItFits}
+                      </div>
+                    )}
+                    {s.placementText && (
+                      <div className="mt-1 text-xs text-ink-light/80">
+                        {s.placementText}
                       </div>
                     )}
                   </div>
@@ -244,13 +274,19 @@ export function DiscoverPanel({
                       size="sm"
                       className="gap-2"
                       onClick={() => {
+                        const sourceUrl = srcUrl;
+                        const notesLines = [
+                          s.whyItFits || null,
+                          sourceUrl || null,
+                        ].filter((v): v is string => !!v);
+                        const sourceNotes = notesLines.join('\n');
                         const newDestination: Destination = {
                           id: generateId(),
                           name: s.name,
                           placeId: s.placeId,
                           address: s.address,
                           location: s.location,
-                          notes: '',
+                          notes: sourceNotes,
                         };
                         onInsert(
                           insertAfterId(
@@ -271,7 +307,8 @@ export function DiscoverPanel({
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
       )}

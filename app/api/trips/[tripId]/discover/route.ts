@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { generateText, Output, streamText } from 'ai';
 import { google } from '@ai-sdk/google';
 import { getTripAccessByToken } from '@/lib/kv';
-import { bestInsertAfterDestinationIdForCandidate, hasValidLocation } from '@/lib/discover';
+import { bestInsertAfterDestinationIdForCandidate, hasValidLocation, haversineKm } from '@/lib/discover';
+import { googlePlacesDetails, googlePlacesFindPlaceFromText } from '@/lib/google-places';
+import { serpapiGoogleMapsSearch, SerpApiQuotaError } from '@/lib/serpapi';
 import type { Coordinates } from '@/types/trip';
 
 const RequestSchema = z.object({
@@ -20,6 +22,8 @@ type PlacesNearbySearchResponse = {
     name?: string;
     vicinity?: string;
     formatted_address?: string;
+    rating?: number;
+    user_ratings_total?: number;
     types?: string[];
     geometry?: { location?: { lat?: number; lng?: number } };
   }>;
@@ -35,6 +39,17 @@ type Candidate = {
   detourKm: number;
   insertAfterDestinationId: string;
   insertAfterName: string;
+  sources?: Array<{ title: string; url: string; snippet?: string }>;
+  sourceKind: 'places' | 'web' | 'both';
+  rating?: number;
+  reviewsCount?: number;
+  description?: string;
+  featuredUserReview?: string;
+  openState?: string;
+  hoursSummary?: string;
+  highlights?: string[];
+  activities?: string[];
+  amenities?: string[];
 };
 
 function isRefererRestrictedKeyError(message: string) {
@@ -84,10 +99,111 @@ async function fetchNearbyPlaces(args: {
       detourKm: 0,
       insertAfterDestinationId: '',
       insertAfterName: '',
+      sourceKind: 'places',
+      rating: typeof r.rating === 'number' ? r.rating : undefined,
+      reviewsCount: typeof r.user_ratings_total === 'number' ? r.user_ratings_total : undefined,
     });
   }
 
   return candidates;
+}
+
+function minDistanceKmToAnchors(
+  anchors: Array<{ destinationId: string; location: Coordinates }>,
+  location: Coordinates
+): number {
+  let best = Number.POSITIVE_INFINITY;
+  for (const a of anchors) {
+    const d = haversineKm(a.location, location);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+function deriveSearchAreaText(args: { dayDestinations: Array<{ name: string; address?: string }> }) {
+  // Best-effort: use the last destination's address fragments as "City, State" (or similar).
+  const last = args.dayDestinations[args.dayDestinations.length - 1];
+  const addr = last?.address?.trim() || '';
+  if (!addr) return last?.name?.trim() || '';
+
+  const parts = addr.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return parts.slice(-2).join(', ');
+  }
+  return parts[0] || last?.name?.trim() || '';
+}
+
+async function fetchSerpApiHiddenGemCandidates(args: {
+  serpApiKey: string;
+  mapsApiKey: string;
+  center: Coordinates;
+  anchors: Array<{ destinationId: string; location: Coordinates }>;
+  existingPlaceIds: Set<string>;
+  dayDestinations: Array<{ name: string; address?: string }>;
+}): Promise<Candidate[]> {
+  const area = deriveSearchAreaText({ dayDestinations: args.dayDestinations });
+  const q = area ? `hidden gems near ${area}` : 'hidden gems near me';
+
+  const hints = await serpapiGoogleMapsSearch({
+    apiKey: args.serpApiKey,
+    query: q,
+    center: args.center,
+    zoom: 12,
+  });
+
+  // Cap validation calls to control upstream API usage.
+  const MAX_VALIDATE = 12;
+  const validated: Candidate[] = [];
+
+  for (const h of hints.slice(0, MAX_VALIDATE)) {
+    // 1) Prefer validating a provided place_id hint (if it really is a Google place_id).
+    const byId =
+      h.placeIdHint != null
+        ? await googlePlacesDetails({ apiKey: args.mapsApiKey, placeId: h.placeIdHint })
+        : null;
+
+    // 2) Fallback: resolve the text name into a place via Find Place.
+    const place =
+      byId ??
+      (await googlePlacesFindPlaceFromText({
+        apiKey: args.mapsApiKey,
+        input: h.name,
+        locationBias: { center: args.center, radiusMeters: 50_000 },
+      }));
+
+    if (!place) continue;
+    if (args.existingPlaceIds.has(place.placeId)) continue;
+
+    // Guardrail: if the resolved place is far from the route anchors, it's likely a bad match
+    // (name collision / wrong region). Drop it.
+    const farKm = minDistanceKmToAnchors(args.anchors, place.location);
+    if (!Number.isFinite(farKm) || farKm > 50) continue;
+
+    validated.push({
+      candidateId: place.placeId,
+      placeId: place.placeId,
+      name: place.name,
+      address: place.address,
+      location: place.location,
+      types: place.types,
+      detourKm: 0,
+      insertAfterDestinationId: '',
+      insertAfterName: '',
+      sources: h.sources,
+      sourceKind: 'web',
+      rating: h.details?.rating,
+      reviewsCount: h.details?.reviews,
+      description: h.details?.description,
+      featuredUserReview: h.details?.featuredUserReview,
+      openState: h.details?.openState,
+      hoursSummary: h.details?.hoursSummary,
+      highlights: h.details?.highlights,
+      activities: h.details?.activities,
+      amenities: h.details?.amenities,
+    });
+  }
+
+  return validated;
 }
 
 export async function POST(
@@ -186,7 +302,42 @@ export async function POST(
       }
     }
 
-    const candidates = Array.from(byId.values()).slice(0, 60).map((c) => {
+    // Optional v2 hidden gems: web-derived candidates via SerpAPI (quota-aware).
+    const serpKey = process.env.SERPAPI_API_KEY?.trim();
+    if (serpKey) {
+      try {
+        const webCandidates = await fetchSerpApiHiddenGemCandidates({
+          serpApiKey: serpKey,
+          mapsApiKey: mapsApiKey,
+          center,
+          anchors,
+          existingPlaceIds,
+          dayDestinations: day.destinations.map((d) => ({ name: d.name, address: d.address })),
+        });
+        for (const c of webCandidates) {
+          const prev = byId.get(c.candidateId);
+          if (!prev) {
+            byId.set(c.candidateId, c);
+          } else {
+            // Merge sources if the same place appears in both sources.
+            byId.set(c.candidateId, {
+              ...prev,
+              sources: [...(prev.sources ?? []), ...(c.sources ?? [])].slice(0, 4),
+              sourceKind: prev.sourceKind === 'places' ? 'both' : prev.sourceKind,
+            });
+          }
+        }
+      } catch (e) {
+        if (e instanceof SerpApiQuotaError) {
+          // Expected on low-quota plans: fall back to Places-only.
+          console.warn('SerpAPI quota/limit hit; falling back to Places-only discover');
+        } else {
+          console.warn('SerpAPI discover failed; falling back to Places-only discover', e);
+        }
+      }
+    }
+
+    const candidates = Array.from(byId.values()).slice(0, 80).map((c) => {
       const { insertAfterDestinationId, detourKm } =
         bestInsertAfterDestinationIdForCandidate({
           anchors,
@@ -222,7 +373,12 @@ export async function POST(
           detourKm: c.detourKm,
           insertAfterDestinationId: c.insertAfterDestinationId,
           whyItFits:
-            `Close to your itinerary with a minimal detour. Fits best after ${c.insertAfterName}.`,
+            c.description ||
+            (c.featuredUserReview ? `“${c.featuredUserReview}”` : '') ||
+            `Low detour (~${c.detourKm.toFixed(1)} km) and a great fit for your day.`,
+          placementText: `Fits best after ${c.insertAfterName}.`,
+          sources: c.sources ?? [],
+          sourceKind: c.sourceKind,
         }));
       return NextResponse.json({ suggestions });
     }
@@ -245,6 +401,16 @@ export async function POST(
         address: c.address,
         types: c.types.slice(0, 6),
         detourKm: Number(c.detourKm.toFixed(2)),
+        insertAfterName: c.insertAfterName,
+        sourceKind: c.sourceKind,
+        sources: (c.sources ?? []).slice(0, 2),
+        openState: c.openState,
+        hoursSummary: c.hoursSummary,
+        description: c.description,
+        featuredUserReview: c.featuredUserReview,
+        highlights: (c.highlights ?? []).slice(0, 4),
+        activities: (c.activities ?? []).slice(0, 4),
+        amenities: (c.amenities ?? []).slice(0, 4),
       }))
       .slice(0, 60);
 
@@ -256,6 +422,10 @@ export async function POST(
       '- You MUST ONLY choose from the provided candidateId list. Do not invent places.',
       '- Prefer minimal detour, but balance with variety (attractions + food + coffee).',
       '- Avoid duplicates of the same type (e.g., 10 cafes).',
+      '- If sourceKind is "web" or "both", treat it as a stronger "hidden gem" signal.',
+      '- If a candidate includes description / featuredUserReview / highlights, use those details (when true) instead of generic phrasing.',
+      '- Do NOT mention ratings, stars, or review counts.',
+      '- Do NOT output placement/ordering phrases like "Located near", "near {another stop}", or "Fits best after"; placement will be handled separately.',
       '',
       `Return up to ${limit} items.`,
       '',
@@ -267,13 +437,13 @@ export async function POST(
       '',
       'For each selected candidate, provide:',
       '- candidateId',
-      '- whyItFits (1 short sentence)',
+      '- whyItFits (2-3 short sentences describing what it is / what you can do there; include concrete interesting details grounded in candidate fields like description/highlights/activities/amenities/user review; no bullets)',
     ].join('\n');
 
     const candidateById = new Map(candidates.map((c) => [c.candidateId, c] as const));
     const elementSchema = z.object({
       candidateId: z.string(),
-      whyItFits: z.string().min(1).max(220),
+      whyItFits: z.string().min(1).max(400),
     });
 
     if (stream) {
@@ -294,7 +464,7 @@ export async function POST(
               if (!c) continue;
               if (seen.has(c.candidateId)) continue;
               seen.add(c.candidateId);
-              const placement = `Fits best after ${c.insertAfterName}.`;
+              const placementText = `Fits best after ${c.insertAfterName}.`;
               controller.enqueue(
                 encoder.encode(
                   JSON.stringify({
@@ -305,7 +475,12 @@ export async function POST(
                     location: c.location,
                     detourKm: c.detourKm,
                     insertAfterDestinationId: c.insertAfterDestinationId,
-                    whyItFits: `${sel.whyItFits} ${placement}`.trim(),
+                    whyItFits: sel.whyItFits,
+                    placementText,
+                    sources: c.sources ?? [],
+                    sourceKind: c.sourceKind,
+                    openState: c.openState,
+                    hoursSummary: c.hoursSummary,
                   }) + '\n'
                 )
               );
@@ -341,7 +516,7 @@ export async function POST(
         if (!c) return null;
         if (seen.has(c.candidateId)) return null;
         seen.add(c.candidateId);
-        const placement = `Fits best after ${c.insertAfterName}.`;
+        const placementText = `Fits best after ${c.insertAfterName}.`;
         return {
           candidateId: c.candidateId,
           placeId: c.placeId,
@@ -350,7 +525,12 @@ export async function POST(
           location: c.location,
           detourKm: c.detourKm,
           insertAfterDestinationId: c.insertAfterDestinationId,
-          whyItFits: `${sel.whyItFits} ${placement}`.trim(),
+          whyItFits: sel.whyItFits,
+          placementText,
+          sources: c.sources ?? [],
+          sourceKind: c.sourceKind,
+          openState: c.openState,
+          hoursSummary: c.hoursSummary,
         };
       })
       .filter((v): v is NonNullable<typeof v> => v != null)
@@ -369,7 +549,14 @@ export async function POST(
           detourKm: c.detourKm,
           insertAfterDestinationId: c.insertAfterDestinationId,
           whyItFits:
-            `Close to your itinerary with a minimal detour. Fits best after ${c.insertAfterName}.`,
+            c.description ||
+            (c.featuredUserReview ? `“${c.featuredUserReview}”` : '') ||
+            `Low detour (~${c.detourKm.toFixed(1)} km) and a great fit for your day.`,
+          placementText: `Fits best after ${c.insertAfterName}.`,
+          sources: c.sources ?? [],
+          sourceKind: c.sourceKind,
+          openState: c.openState,
+          hoursSummary: c.hoursSummary,
         }));
       return NextResponse.json({ suggestions: fallback });
     }
