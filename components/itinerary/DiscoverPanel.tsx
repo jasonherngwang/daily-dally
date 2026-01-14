@@ -85,8 +85,16 @@ export function DiscoverPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<DiscoverSuggestion[]>([]);
+  const seenPlaceIdsRef = useRef<Set<string>>(new Set());
 
   const LIMIT = 6;
+
+  // Reset "seen" suggestions when switching days (or trips).
+  useEffect(() => {
+    seenPlaceIdsRef.current = new Set();
+    setSuggestions([]);
+    setError(null);
+  }, [dayId, tripToken]);
 
   // Clear map preview when panel closes.
   const wasOpenRef = useRef(false);
@@ -117,7 +125,13 @@ export function DiscoverPanel({
         buffer = buffer.slice(idx + 1);
         const trimmed = line.trim();
         if (!trimmed) continue;
-        const s = JSON.parse(trimmed) as DiscoverSuggestion;
+        const parsed = JSON.parse(trimmed) as DiscoverSuggestion | { error?: string };
+        if ('error' in parsed && parsed.error) {
+          throw new Error(parsed.error);
+        }
+        const s = parsed as DiscoverSuggestion;
+        if (s.placeId && seenPlaceIdsRef.current.has(s.placeId)) continue;
+        if (s.placeId) seenPlaceIdsRef.current.add(s.placeId);
         setSuggestions((prev) => {
           if (prev.some((p) => p.candidateId === s.candidateId)) return prev;
           return [...prev, s].slice(0, LIMIT);
@@ -132,10 +146,11 @@ export function DiscoverPanel({
     setIsLoading(true);
     setError(null);
     try {
+      const excludePlaceIds = Array.from(seenPlaceIdsRef.current).slice(-200);
       const res = await fetch(`/api/trips/${tripToken}/discover`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dayId, limit: LIMIT, stream: true }),
+        body: JSON.stringify({ dayId, limit: LIMIT, stream: true, excludePlaceIds }),
       });
       if (!res.ok) {
         const msg = await res.text().catch(() => '');
@@ -146,7 +161,13 @@ export function DiscoverPanel({
         await readNdjsonSuggestions(res);
       } else {
         const data = (await res.json()) as DiscoverResponse;
-        setSuggestions((data.suggestions ?? []).slice(0, LIMIT));
+        const next = (data.suggestions ?? [])
+          .filter((s) => !s.placeId || !seenPlaceIdsRef.current.has(s.placeId))
+          .slice(0, LIMIT);
+        for (const s of next) {
+          if (s.placeId) seenPlaceIdsRef.current.add(s.placeId);
+        }
+        setSuggestions(next);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to discover suggestions');
