@@ -29,6 +29,11 @@
     line-height: 1.7;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /*
+      Prevent subtle desktop layout shift when content height changes between Days.
+      (Scrollbar appearing/disappearing changes viewport width.)
+    */
+    scrollbar-gutter: stable;
   }
 
   body {
