@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Check,
   Copy,
   Eye,
+  Home,
   MoreVertical,
   Pencil,
   Trash2,
@@ -15,7 +15,6 @@ import {
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Badge } from '@/components/ui/Badge';
-import { TopoLogo } from '@/components/brand/TopoLogo';
 import type { Trip } from '@/types/trip';
 import { clearRecentTrips, getRecentTrips, removeRecentTrip, type RecentTrip } from '@/lib/recents';
 
@@ -148,17 +147,9 @@ export function TripHeader({
           </div>
         ) : (
           <div className="flex items-center gap-2 min-w-0">
-            <Link
-              href="/"
-              className="shrink-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2"
-              title="Home"
-              aria-label="Home"
-            >
-              <TopoLogo className="h-9 w-9" />
-            </Link>
             <h1
               className={[
-                'text-xl sm:text-2xl font-display font-bold text-ink leading-tight truncate px-2 py-1',
+                'text-xl sm:text-2xl font-display font-bold text-ink leading-tight truncate py-1',
                 isReadOnly
                   ? 'cursor-default'
                   : 'cursor-pointer hover:text-ink-light transition-colors',
@@ -250,6 +241,18 @@ export function TripHeader({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
               <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-parchment-mid card-elevated z-20 overflow-hidden">
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    router.push('/');
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-ink hover:bg-parchment transition-colors cursor-pointer"
+                >
+                  <Home className="h-4 w-4 text-ink-light" />
+                  Home
+                </button>
+                <div className="h-px bg-border/60" />
+
                 <div className="px-4 pt-3 pb-2 text-xs font-semibold text-ink-light uppercase tracking-wide">
                   Recent trips
                 </div>

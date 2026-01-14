@@ -71,7 +71,7 @@ export function DayEditor({
                 value={editLabel}
                 onChange={(e) => setEditLabel(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="h-8 text-sm font-semibold"
+                className="h-9 text-base sm:text-lg font-display font-semibold"
                 autoFocus
                 disabled={readOnly}
               />
@@ -87,7 +87,7 @@ export function DayEditor({
             </div>
           ) : (
             <div
-              className="font-semibold text-ink truncate cursor-pointer hover:text-forest transition-colors"
+              className="font-display font-semibold text-lg sm:text-xl text-ink truncate cursor-pointer hover:text-forest transition-colors"
               onClick={handleStartEdit}
               title={readOnly ? undefined : 'Click to rename'}
             >
