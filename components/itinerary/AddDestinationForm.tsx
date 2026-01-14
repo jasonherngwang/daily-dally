@@ -83,7 +83,7 @@ export function AddDestinationForm({
           <span className="min-w-0 whitespace-normal leading-tight">Search</span>
         </Button>
 
-        {canDiscover ? (
+        {canDiscover && (
           <Button
             size="sm"
             variant="secondary"
@@ -93,8 +93,6 @@ export function AddDestinationForm({
             <Sparkles className="h-4 w-4 shrink-0" />
             <span className="min-w-0 whitespace-normal leading-tight">Discover</span>
           </Button>
-        ) : (
-          <div className="hidden sm:block sm:flex-1" />
         )}
 
         <Button
