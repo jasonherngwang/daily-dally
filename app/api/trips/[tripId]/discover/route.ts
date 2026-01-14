@@ -12,6 +12,7 @@ const RequestSchema = z.object({
   dayId: z.string().min(1),
   limit: z.number().int().min(1).max(20).optional(),
   stream: z.boolean().optional(),
+  excludePlaceIds: z.array(z.string().min(1)).max(500).optional(),
 });
 
 type PlacesNearbySearchResponse = {
@@ -229,6 +230,7 @@ export async function POST(
     const { dayId } = parsed.data;
     const limit = parsed.data.limit ?? 6;
     const stream = parsed.data.stream ?? false;
+    const excludePlaceIds = parsed.data.excludePlaceIds ?? [];
 
     const day = access.trip.days.find((d) => d.id === dayId);
     if (!day) {
@@ -265,6 +267,9 @@ export async function POST(
     const existingPlaceIds = new Set(
       day.destinations.map((d) => d.placeId).filter((v): v is string => !!v)
     );
+    for (const placeId of excludePlaceIds) {
+      existingPlaceIds.add(placeId);
+    }
 
     const center = anchors[anchors.length - 1]!.location;
 
