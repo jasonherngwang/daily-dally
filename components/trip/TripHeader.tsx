@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Check,
@@ -14,6 +15,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Badge } from '@/components/ui/Badge';
+import { TopoLogo } from '@/components/brand/TopoLogo';
 import type { Trip } from '@/types/trip';
 import { clearRecentTrips, getRecentTrips, removeRecentTrip, type RecentTrip } from '@/lib/recents';
 
@@ -146,6 +148,14 @@ export function TripHeader({
           </div>
         ) : (
           <div className="flex items-center gap-2 min-w-0">
+            <Link
+              href="/"
+              className="shrink-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2"
+              title="Home"
+              aria-label="Home"
+            >
+              <TopoLogo className="h-9 w-9" />
+            </Link>
             <h1
               className={[
                 'text-xl sm:text-2xl font-display font-bold text-ink leading-tight truncate px-2 py-1',

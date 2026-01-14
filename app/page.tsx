@@ -1,10 +1,22 @@
 import { CreateTripForm } from '@/components/trip/CreateTripForm';
+import Link from 'next/link';
+import { TopoLogo } from '@/components/brand/TopoLogo';
 
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center topo-pattern px-4 py-12 sm:py-16">
       <div className="w-full max-w-lg space-y-12">
         <div className="text-center space-y-6">
+          <div className="flex justify-center">
+            <Link
+              href="/"
+              className="rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2"
+              aria-label="Home"
+              title="Daily Dally"
+            >
+              <TopoLogo className="h-12 w-12 sm:h-14 sm:w-14" />
+            </Link>
+          </div>
           <h1 className="font-display text-5xl sm:text-6xl font-bold text-ink leading-tight">
             Daily Dally
           </h1>
