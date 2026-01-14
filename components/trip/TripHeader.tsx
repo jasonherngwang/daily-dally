@@ -6,6 +6,7 @@ import {
   Check,
   Copy,
   Eye,
+  Home,
   MoreVertical,
   Pencil,
   Trash2,
@@ -148,7 +149,7 @@ export function TripHeader({
           <div className="flex items-center gap-2 min-w-0">
             <h1
               className={[
-                'text-xl sm:text-2xl font-display font-bold text-ink leading-tight truncate px-2 py-1',
+                'text-xl sm:text-2xl font-display font-bold text-ink leading-tight truncate py-1',
                 isReadOnly
                   ? 'cursor-default'
                   : 'cursor-pointer hover:text-ink-light transition-colors',
@@ -240,6 +241,18 @@ export function TripHeader({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
               <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-parchment-mid card-elevated z-20 overflow-hidden">
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    router.push('/');
+                  }}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-ink hover:bg-parchment transition-colors cursor-pointer"
+                >
+                  <Home className="h-4 w-4 text-ink-light" />
+                  Home
+                </button>
+                <div className="h-px bg-border/60" />
+
                 <div className="px-4 pt-3 pb-2 text-xs font-semibold text-ink-light uppercase tracking-wide">
                   Recent trips
                 </div>

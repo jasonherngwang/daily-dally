@@ -71,7 +71,7 @@ export function DayEditor({
                 value={editLabel}
                 onChange={(e) => setEditLabel(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="h-8 text-sm font-semibold"
+                className="h-9 text-base sm:text-lg font-display font-semibold"
                 autoFocus
                 disabled={readOnly}
               />
@@ -87,7 +87,7 @@ export function DayEditor({
             </div>
           ) : (
             <div
-              className="font-semibold text-ink truncate cursor-pointer hover:text-forest transition-colors"
+              className="font-display font-semibold text-lg sm:text-xl text-ink truncate cursor-pointer hover:text-forest transition-colors"
               onClick={handleStartEdit}
               title={readOnly ? undefined : 'Click to rename'}
             >
@@ -102,7 +102,14 @@ export function DayEditor({
             size="sm"
             className="gap-2 text-ink-light hover:text-red-700 focus-visible:text-red-700 active:text-red-700"
             disabled={!canDeleteDay}
-            onClick={() => onDeleteDay?.(day.id)}
+            onClick={() => {
+              if (!canDeleteDay) return;
+              const ok = confirm(
+                `Delete ${day.label}? This will remove the entire day and its destinations. This action cannot be undone.`
+              );
+              if (!ok) return;
+              onDeleteDay?.(day.id);
+            }}
             title={
               trip.days.length <= 1
                 ? 'You need at least one day in a trip'
