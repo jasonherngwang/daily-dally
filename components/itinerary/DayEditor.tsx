@@ -102,7 +102,14 @@ export function DayEditor({
             size="sm"
             className="gap-2 text-ink-light hover:text-red-700 focus-visible:text-red-700 active:text-red-700"
             disabled={!canDeleteDay}
-            onClick={() => onDeleteDay?.(day.id)}
+            onClick={() => {
+              if (!canDeleteDay) return;
+              const ok = confirm(
+                `Delete ${day.label}? This will remove the entire day and its destinations. This action cannot be undone.`
+              );
+              if (!ok) return;
+              onDeleteDay?.(day.id);
+            }}
             title={
               trip.days.length <= 1
                 ? 'You need at least one day in a trip'
