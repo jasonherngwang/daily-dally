@@ -254,8 +254,8 @@ export function DiscoverPanel({
                   onMouseEnter={() => onPreviewLocationChange?.(s.location)}
                   onMouseLeave={() => onPreviewLocationChange?.(null)}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 pr-2">
+                  <div className="grid grid-cols-[1fr_auto] items-start gap-x-3">
+                    <div className="min-w-0">
                       <h3 className="font-display font-semibold text-ink text-base leading-tight break-words">
                         {s.name}
                       </h3>
@@ -278,19 +278,9 @@ export function DiscoverPanel({
                         {[s.openState, s.hoursSummary].filter(Boolean).join(' • ')}
                       </div>
                     )}
-                    {s.whyItFits && (
-                      <div className="mt-1.5 text-sm text-ink-light">
-                        {s.whyItFits}
-                      </div>
-                    )}
-                    {s.placementText && (
-                      <div className="mt-1 text-xs text-ink-light/80">
-                        {s.placementText}
-                      </div>
-                    )}
                   </div>
 
-                  <div className="shrink-0 flex flex-col items-end gap-1">
+                  <div className="shrink-0 flex items-start justify-end">
                     <Button
                       size="sm"
                       className="gap-2"
@@ -326,6 +316,17 @@ export function DiscoverPanel({
                       Add
                     </Button>
                   </div>
+
+                  {s.whyItFits && (
+                    <div className="col-span-2 mt-1.5 text-sm text-ink-light">
+                      {s.whyItFits}
+                    </div>
+                  )}
+                  {s.placementText && (
+                    <div className="col-span-2 mt-1 text-xs text-ink-light/80">
+                      {s.placementText}
+                    </div>
+                  )}
                 </div>
               </div>
               );
