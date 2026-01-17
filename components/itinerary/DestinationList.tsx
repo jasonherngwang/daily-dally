@@ -114,7 +114,6 @@ export function DestinationList({
               onPointerDownCapture={(e) => {
                 if (!onSelectDestination) return;
                 if (isDraggingRef.current) return;
-                if (!hasValidLocation(destination)) return;
                 const t = e.target as HTMLElement | null;
                 // Don't select when interacting with buttons/inputs/links, etc.
                 // NOTE: dnd-kit applies `role="button"` to the draggable card; do not treat that as an interactive child.
@@ -162,7 +161,6 @@ export function DestinationList({
                 onPointerDownCapture={(e) => {
                   if (!onSelectDestination) return;
                   if (isDraggingRef.current) return;
-                  if (!hasValidLocation(destination)) return;
                   const t = e.target as HTMLElement | null;
                   if (t?.closest('button, a, input, textarea, select')) return;
                   onSelectDestination(destination.id);
