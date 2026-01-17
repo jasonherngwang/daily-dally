@@ -242,7 +242,7 @@ export function TripSearchModal({
                 setActiveIndex(0);
               }}
               placeholder="Search destinations, notes, addresses…"
-              className="h-10 pl-10 pr-3 bg-parchment-dark/60"
+              className="h-10 pl-10 pr-3"
             />
           </div>
           <IconButton

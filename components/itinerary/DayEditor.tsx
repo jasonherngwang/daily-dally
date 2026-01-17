@@ -7,6 +7,7 @@ import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { generateId } from '@/lib/ulid';
+import { MoveToDayModal } from '@/components/itinerary/MoveToDayModal';
 import type { Coordinates, Day, Trip } from '@/types/trip';
 
 interface DayEditorProps {
@@ -14,6 +15,7 @@ interface DayEditorProps {
   day: Day;
   trip: Trip;
   onUpdate: (day: Day) => void;
+  onMoveDestination: (fromDayId: string, destinationId: string, toDayId: string) => void;
   onDeleteDay?: (dayId: string) => void;
   onRenameDay?: (dayId: string, newLabel: string) => void;
   onPreviewLocationChange?: (location: Coordinates | null) => void;
@@ -27,6 +29,7 @@ export function DayEditor({
   day,
   trip,
   onUpdate,
+  onMoveDestination,
   onDeleteDay,
   onRenameDay,
   onPreviewLocationChange,
@@ -37,6 +40,7 @@ export function DayEditor({
   const [isEditing, setIsEditing] = useState(false);
   const [editLabel, setEditLabel] = useState('');
   const canDeleteDay = !readOnly && trip.days.length > 1 && !!onDeleteDay;
+  const [moveDestinationId, setMoveDestinationId] = useState<string | null>(null);
 
   const handleStartEdit = () => {
     if (readOnly) return;
@@ -76,19 +80,27 @@ export function DayEditor({
                 onChange={(e) => setEditLabel(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onBlur={handleSaveEdit}
-                className="h-9 text-base sm:text-lg font-display font-semibold"
+                className="h-9 bg-transparent border-transparent px-2 py-1 text-lg sm:text-xl font-display font-semibold leading-tight focus-visible:ring-offset-parchment"
                 autoFocus
                 disabled={readOnly}
               />
             </div>
           ) : (
-            <div
-              className="font-display font-semibold text-lg sm:text-xl text-ink truncate cursor-pointer hover:text-forest transition-colors"
+            <button
+              type="button"
+              className={[
+                // Match TripHeader title inset so entering edit mode doesn't feel like the text moved.
+                'h-9 font-display font-semibold text-lg sm:text-xl text-ink truncate text-left px-2 py-1 border border-transparent rounded-xl leading-tight',
+                readOnly
+                  ? 'cursor-default'
+                  : 'cursor-pointer hover:text-forest transition-colors',
+              ].join(' ')}
               onClick={handleStartEdit}
               title={readOnly ? undefined : 'Click to rename'}
+              disabled={readOnly}
             >
               {day.label}
-            </div>
+            </button>
           )}
         </div>
 
@@ -168,6 +180,24 @@ export function DayEditor({
           if (readOnly) return;
           const updated = day.destinations.filter((_, i) => i !== index);
           onUpdate({ ...day, destinations: updated });
+        }}
+        onMove={(destinationId) => {
+          if (readOnly) return;
+          setMoveDestinationId(destinationId);
+        }}
+      />
+
+      <MoveToDayModal
+        open={!readOnly && moveDestinationId != null}
+        days={trip.days}
+        currentDayId={day.id}
+        onClose={() => setMoveDestinationId(null)}
+        onSelectDay={(toDayId) => {
+          if (readOnly) return;
+          const destinationId = moveDestinationId;
+          if (!destinationId) return;
+          setMoveDestinationId(null);
+          onMoveDestination(day.id, destinationId, toDayId);
         }}
       />
     </div>

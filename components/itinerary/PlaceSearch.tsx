@@ -277,7 +277,7 @@ export function PlaceSearch({
               if (picked) void selectSuggestion(picked);
             }
           }}
-          className="pr-10"
+          className="pr-10 bg-parchment-mid border-border/70"
         />
 
         {(isBootstrapping || isSearching) && (
@@ -288,7 +288,7 @@ export function PlaceSearch({
       </div>
 
       {shouldShowDropdown && (
-        <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-border/50 bg-parchment-dark card-elevated">
+        <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-border/50 bg-parchment card-elevated">
           <div ref={listRef} className="max-h-72 overflow-auto">
             {selectableSuggestions.map((s, idx) => {
               const p = s.placePrediction;
