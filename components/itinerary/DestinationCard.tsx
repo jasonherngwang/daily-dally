@@ -133,7 +133,7 @@ export function DestinationCard({
       {...listeners}
       className={`
         flex items-start gap-2 sm:gap-3 ${!readOnly ? 'sm:cursor-grab sm:active:cursor-grabbing touch-manipulation' : ''}
-        ${isActive ? 'ring-2 ring-terracotta ring-inset card-elevated-lg' : ''}
+        ${isActive ? 'ring-2 ring-forest ring-inset card-elevated-lg' : ''}
         ${!hasLocation ? 'opacity-80' : ''}
         ${isDragging ? 'shadow-lg' : ''}
         transition-colors duration-200

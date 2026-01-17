@@ -386,6 +386,7 @@ export function TripMap({
           lat: destination.location.lat,
           lng: destination.location.lng,
         };
+        const zIndex = isActive ? 1_000_000 : index + 1;
 
         let marker:
           | google.maps.marker.AdvancedMarkerElement
@@ -397,6 +398,7 @@ export function TripMap({
             map: mapInstanceRef.current!,
             title: destination.name,
             content: createCustomMarkerContent(index + 1, isActive),
+            zIndex,
           });
 
           // Advanced markers fire `gmp-click` instead of `click`.
@@ -415,6 +417,7 @@ export function TripMap({
             map: mapInstanceRef.current!,
             title: destination.name,
             icon: createCustomMarkerIcon(index + 1, isActive),
+            zIndex,
             label: {
               text: String(index + 1),
               color: "white",
@@ -472,10 +475,13 @@ export function TripMap({
       if (!destination) return;
 
       const isActive = destination.id === activeDestinationId;
+      const zIndex = isActive ? 1_000_000 : index + 1;
       if (isLegacyMarker(marker)) {
         marker.setIcon(createCustomMarkerIcon(index + 1, isActive));
+        marker.setZIndex(zIndex);
       } else {
         marker.content = createCustomMarkerContent(index + 1, isActive);
+        marker.zIndex = zIndex;
       }
     });
   }, [activeDestinationId, destinationsWithLocation]);
@@ -518,8 +524,8 @@ function createCustomMarkerContent(
   number: number,
   isActive: boolean
 ): HTMLElement {
-  const size = isActive ? 40 : 36;
-  const color = "#C4704B";
+  const size = isActive ? 44 : 36;
+  const color = isActive ? "#2D5A45" : "#C4704B";
 
   const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
     <circle cx="${size / 2}" cy="${size / 2}" r="${
@@ -542,8 +548,8 @@ function createCustomMarkerIcon(
   number: number,
   isActive: boolean
 ): google.maps.Icon {
-  const size = isActive ? 40 : 36;
-  const color = "#C4704B";
+  const size = isActive ? 44 : 36;
+  const color = isActive ? "#2D5A45" : "#C4704B";
 
   const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
     <circle cx="${size / 2}" cy="${size / 2}" r="${
