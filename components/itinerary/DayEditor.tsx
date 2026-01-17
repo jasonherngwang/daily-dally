@@ -3,10 +3,9 @@
 import { useState } from 'react';
 import { DestinationList } from './DestinationList';
 import { AddDestinationForm } from './AddDestinationForm';
-import { Trash2, Check } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { IconButton } from '@/components/ui/IconButton';
 import { generateId } from '@/lib/ulid';
 import type { Coordinates, Day, Trip } from '@/types/trip';
 
@@ -46,9 +45,14 @@ export function DayEditor({
   };
 
   const handleSaveEdit = () => {
-    if (editLabel.trim() && onRenameDay) {
-      onRenameDay(day.id, editLabel.trim());
+    if (readOnly) return;
+    const next = editLabel.trim();
+    if (!next) {
+      setIsEditing(false);
+      setEditLabel(day.label);
+      return;
     }
+    onRenameDay?.(day.id, next);
     setIsEditing(false);
   };
 
@@ -71,19 +75,11 @@ export function DayEditor({
                 value={editLabel}
                 onChange={(e) => setEditLabel(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onBlur={handleSaveEdit}
                 className="h-9 text-base sm:text-lg font-display font-semibold"
                 autoFocus
                 disabled={readOnly}
               />
-              <IconButton
-                variant="ghost"
-                size="sm"
-                onClick={handleSaveEdit}
-                className="h-8 w-8"
-                disabled={readOnly}
-              >
-                <Check className="h-4 w-4" />
-              </IconButton>
             </div>
           ) : (
             <div

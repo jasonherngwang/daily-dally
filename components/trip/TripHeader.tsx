@@ -9,12 +9,14 @@ import {
   Home,
   MoreVertical,
   Pencil,
+  Search,
   Trash2,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { Badge } from '@/components/ui/Badge';
+import { Input } from '@/components/ui/Input';
 import type { Trip } from '@/types/trip';
 import { clearRecentTrips, getRecentTrips, removeRecentTrip, type RecentTrip } from '@/lib/recents';
 
@@ -28,6 +30,7 @@ interface TripHeaderProps {
   };
   onUpdate: (trip: Trip) => void;
   onDelete: () => void;
+  onOpenSearch?: () => void;
 }
 
 export function TripHeader({
@@ -37,6 +40,7 @@ export function TripHeader({
   tokens,
   onUpdate,
   onDelete,
+  onOpenSearch,
 }: TripHeaderProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
@@ -167,6 +171,47 @@ export function TripHeader({
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
+        {/* Search (opens modal) */}
+        {onOpenSearch && (
+          <>
+            <div className="hidden sm:block w-[280px]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-light" />
+                <Input
+                  readOnly
+                  value=""
+                  placeholder="Search…"
+                  className="h-9 pl-9 pr-14 bg-parchment-dark/60 cursor-pointer"
+                  onFocus={(e) => {
+                    e.currentTarget.blur();
+                    onOpenSearch();
+                  }}
+                  onMouseDown={(e) => {
+                    // Prevent text selection + keep it feeling like a button.
+                    e.preventDefault();
+                    onOpenSearch();
+                  }}
+                  aria-label="Search trip"
+                />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-1 text-[11px] text-ink-light font-mono">
+                  <span className="rounded border border-border/70 bg-parchment-mid px-1.5 py-0.5">⌘</span>
+                  <span className="rounded border border-border/70 bg-parchment-mid px-1.5 py-0.5">K</span>
+                </div>
+              </div>
+            </div>
+
+            <IconButton
+              variant="ghost"
+              size="sm"
+              className="sm:hidden h-8 w-8"
+              title="Search"
+              onClick={onOpenSearch}
+            >
+              <Search className="h-4 w-4" />
+            </IconButton>
+          </>
+        )}
+
         <div className="relative">
           <Button
             variant="ghost"
