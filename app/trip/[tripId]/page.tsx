@@ -9,7 +9,7 @@ import { DayEditor } from '@/components/itinerary/DayEditor';
 import { TripMap } from '@/components/map/TripMap';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { generateId } from '@/lib/ulid';
-import type { Coordinates, Day } from '@/types/trip';
+import type { Coordinates, Day, Destination } from '@/types/trip';
 import { TripSearchModal, type TripSearchSelection } from '@/components/search/TripSearchModal';
 
 function isEditableElement(el: Element | null) {
@@ -245,6 +245,55 @@ export default function TripPage() {
     });
   };
 
+  const handleMoveDestination = useCallback(
+    async (fromDayId: string, destinationId: string, toDayId: string) => {
+      if (!trip || isReadOnly) return;
+      if (fromDayId === toDayId) return;
+
+      const fromDay = trip.days.find((d) => d.id === fromDayId);
+      const toDay = trip.days.find((d) => d.id === toDayId);
+      if (!fromDay || !toDay) return;
+
+      const destination: Destination | undefined = fromDay.destinations.find(
+        (d) => d.id === destinationId
+      );
+      if (!destination) return;
+
+      // If moving out of the active day, clear selection/hover for that destination.
+      if (activeDayId === fromDayId) {
+        setSelected((prev) =>
+          prev.dayId === fromDayId && prev.id === destinationId
+            ? { dayId: fromDayId, id: null }
+            : prev
+        );
+        setHovered((prev) =>
+          prev.dayId === fromDayId && prev.id === destinationId
+            ? { dayId: fromDayId, id: null }
+            : prev
+        );
+      }
+
+      const newDays = trip.days.map((day) => {
+        if (day.id === fromDayId) {
+          return {
+            ...day,
+            destinations: day.destinations.filter((d) => d.id !== destinationId),
+          };
+        }
+        if (day.id === toDayId) {
+          return {
+            ...day,
+            destinations: [...day.destinations, destination],
+          };
+        }
+        return day;
+      });
+
+      await updateTrip({ ...trip, days: newDays });
+    },
+    [activeDayId, isReadOnly, trip, updateTrip]
+  );
+
   const handleDeleteTrip = async () => {
     if (isReadOnly) return;
     try {
@@ -318,6 +367,7 @@ export default function TripPage() {
                 }}
                 onDeleteDay={handleDeleteDay}
                 onRenameDay={handleRenameDay}
+                onMoveDestination={handleMoveDestination}
                 onUpdate={(updatedDay) => {
                   if (isReadOnly) return;
                   const updatedDays = trip.days.map((d) =>

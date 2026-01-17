@@ -74,10 +74,11 @@ function SortableDayTab({
       <div
         className={`
           flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200 cursor-pointer
+          border
           ${
             isActive
-              ? 'bg-forest text-white shadow-sm'
-              : 'bg-parchment-dark text-ink hover:bg-parchment border border-border/30'
+              ? 'bg-forest text-white shadow-sm border-forest/30'
+              : 'bg-parchment-mid text-ink hover:bg-parchment border-border/50'
           }
         `}
         onClick={() => onDaySelect(day.id)}

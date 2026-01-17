@@ -2,20 +2,24 @@
 @import "tailwindcss";
 
 @theme {
-  --color-parchment: #F5F0E6;
-  --color-parchment-mid: #F0E9DD;
-  --color-parchment-dark: #E8E0D0;
+  /* Contrast-tuned parchment palette:
+     - Page background a touch darker
+     - Card surfaces a touch lighter
+     - Keep warmth (avoid drifting toward gray) */
+  --color-parchment: #EFE7D9;
+  --color-parchment-mid: #F8F3EB;
+  --color-parchment-dark: #E6D9C6;
   --color-ink: #2C2416;
-  --color-ink-light: #5C5040;
+  --color-ink-light: #4F4437;
   --color-forest: #2D5A45;
   --color-forest-light: #3D7A5C;
   --color-terracotta: #C4704B;
   --color-terracotta-light: #D4886B;
-  --color-border: #D4C9B8;
-  --color-contour: #D4C9B8;
-  --color-contour-dark: #B8A890;
-  --color-shadow: rgba(44, 36, 22, 0.08);
-  --color-shadow-lg: rgba(44, 36, 22, 0.12);
+  --color-border: #C9BBA6;
+  --color-contour: #C9BBA6;
+  --color-contour-dark: #A9967C;
+  --color-shadow: rgba(44, 36, 22, 0.10);
+  --color-shadow-lg: rgba(44, 36, 22, 0.14);
   --font-display: 'Playfair Display', Georgia, serif;
   --font-body: 'Source Sans 3', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
