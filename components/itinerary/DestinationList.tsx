@@ -26,6 +26,7 @@ interface DestinationListProps {
   onReorder: (destinations: Destination[]) => void;
   onUpdate: (index: number, destination: Destination) => void;
   onDelete: (index: number) => void;
+  onMove?: (destinationId: string) => void;
   activeDestinationId?: string;
   onSelectDestination?: (destinationId: string) => void;
   readOnly?: boolean;
@@ -36,6 +37,7 @@ export function DestinationList({
   onReorder,
   onUpdate,
   onDelete,
+  onMove,
   activeDestinationId,
   onSelectDestination,
   readOnly = false,
@@ -88,23 +90,18 @@ export function DestinationList({
     );
   }
 
-  // Only destinations with locations get numbers (and participate in "previous destination" for directions).
+  // Only destinations with locations get numbers.
   let locationCounter = 0;
-  let lastLocationDestination: Destination | undefined;
   const renderItems = validDestinations.map((destination) => {
     const isLocation = hasValidLocation(destination);
     const locationNumber = isLocation ? ++locationCounter : undefined;
-    const previousDestination = isLocation ? lastLocationDestination : undefined;
-    if (isLocation) {
-      lastLocationDestination = destination;
-    }
-    return { destination, locationNumber, previousDestination };
+    return { destination, locationNumber };
   });
 
   if (readOnly) {
     return (
       <div className="flex flex-col">
-        {renderItems.map(({ destination, locationNumber, previousDestination }, index) => {
+        {renderItems.map(({ destination, locationNumber }, index) => {
           const isLast = index === validDestinations.length - 1;
           return (
             <div
@@ -124,11 +121,11 @@ export function DestinationList({
               <DestinationCard
                 destination={destination}
                 locationNumber={locationNumber}
-                previousDestination={previousDestination}
                 isActive={destination.id === activeDestinationId}
                 readOnly
                 onUpdate={() => {}}
                 onDelete={() => {}}
+                onMove={undefined}
               />
             </div>
           );
@@ -150,7 +147,7 @@ export function DestinationList({
         strategy={verticalListSortingStrategy}
       >
         <div className="flex flex-col">
-          {renderItems.map(({ destination, locationNumber, previousDestination }, index) => {
+          {renderItems.map(({ destination, locationNumber }, index) => {
             const originalIndex = destinations.findIndex((d) => d.id === destination.id);
             const isLast = index === validDestinations.length - 1;
             return (
@@ -169,10 +166,10 @@ export function DestinationList({
                 <DestinationCard
                   destination={destination}
                   locationNumber={locationNumber}
-                  previousDestination={previousDestination}
                   isActive={destination.id === activeDestinationId}
                   onUpdate={(updated) => onUpdate(originalIndex, updated)}
                   onDelete={() => onDelete(originalIndex)}
+                  onMove={onMove ? () => onMove(destination.id) : undefined}
                 />
               </div>
             );
