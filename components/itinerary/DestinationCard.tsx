@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import { GripVertical, Edit2, Trash2, Navigation, FileText } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Edit2, Trash2, Navigation, FileText, MoreVertical, ArrowLeftRight } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card } from '@/components/ui/Card';
@@ -9,7 +9,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
-import { getGoogleMapsNavigationUrl, getGoogleMapsDirectionsUrl } from '@/lib/navigation';
+import { getGoogleMapsNavigationUrl } from '@/lib/navigation';
 import type { Destination } from '@/types/trip';
 
 const URL_REGEX = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/g;
@@ -63,31 +63,52 @@ function renderTextWithLinks(text: string): ReactNode {
 interface DestinationCardProps {
   destination: Destination;
   locationNumber?: number;
-  previousDestination?: Destination;
   isActive?: boolean;
   readOnly?: boolean;
   onUpdate: (updated: Destination) => void;
   onDelete: () => void;
+  onMove?: () => void;
 }
 
 export function DestinationCard({
   destination,
   locationNumber,
-  previousDestination,
   isActive,
   readOnly = false,
   onUpdate,
   onDelete,
+  onMove,
 }: DestinationCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(destination.name);
   const [notes, setNotes] = useState(destination.notes);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const hasLocation = !!destination.location;
   const navigationUrl = hasLocation ? getGoogleMapsNavigationUrl(destination) : null;
-  const directionsUrl = previousDestination && hasLocation && previousDestination.location
-    ? getGoogleMapsDirectionsUrl(previousDestination, destination)
-    : null;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (menuRef.current?.contains(t)) return;
+      setMenuOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
 
   const {
     attributes,
@@ -134,18 +155,11 @@ export function DestinationCard({
       className={`
         flex items-start gap-2 sm:gap-3 ${!readOnly ? 'sm:cursor-grab sm:active:cursor-grabbing touch-manipulation' : ''}
         ${isActive ? 'ring-2 ring-forest ring-inset card-elevated-lg' : ''}
-        ${!hasLocation ? 'opacity-80' : ''}
         ${isDragging ? 'shadow-lg' : ''}
+        overflow-visible
         transition-colors duration-200
       `}
     >
-      {/* Drag handle - hidden on mobile and in read-only mode */}
-      {!readOnly && (
-        <div className="hidden sm:block mt-1 text-ink-light p-1">
-          <GripVertical className="h-4 w-4" />
-        </div>
-      )}
-
       {/* Number badge */}
       <div
         className={`
@@ -232,19 +246,57 @@ export function DestinationCard({
                       size="sm"
                       onClick={() => setIsEditing(true)}
                       className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-terracotta/10"
-                      title="Edit destination"
+                      title="Edit"
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                     </IconButton>
-                    <IconButton
-                      variant="ghost"
-                      size="sm"
-                      onClick={onDelete}
-                      className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-terracotta/10 group"
-                      title="Delete destination"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 group-hover:text-red-600" />
-                    </IconButton>
+
+                    <div className="relative" ref={menuRef}>
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setMenuOpen((v) => !v)}
+                        className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-terracotta/10"
+                        title="More actions"
+                        aria-label="More actions"
+                        aria-expanded={menuOpen}
+                      >
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </IconButton>
+
+                      {menuOpen && (
+                        <div
+                          className="absolute right-0 top-9 z-50 w-44 rounded-xl border border-border/70 bg-parchment-mid card-elevated overflow-hidden"
+                          role="menu"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-parchment-dark/70 transition-colors flex items-center gap-2"
+                            role="menuitem"
+                            onClick={() => {
+                              setMenuOpen(false);
+                              onMove?.();
+                            }}
+                          >
+                            <ArrowLeftRight className="h-4 w-4 text-ink-light" />
+                            <span>Move to…</span>
+                          </button>
+
+                          <button
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-parchment-dark/70 transition-colors flex items-center gap-2"
+                            role="menuitem"
+                            onClick={() => {
+                              setMenuOpen(false);
+                              onDelete();
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-700" />
+                            <span className="text-red-700">Delete</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -258,17 +310,6 @@ export function DestinationCard({
               </div>
             )}
 
-            {directionsUrl && (
-              <button
-                onClick={() => window.open(directionsUrl, '_blank')}
-                onPointerDown={(e) => e.stopPropagation()}
-                onTouchStart={(e) => e.stopPropagation()}
-                className="mt-2 text-xs text-forest hover:text-forest-light flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Navigation className="h-3 w-3" />
-                <span>from {previousDestination?.name || 'previous'}</span>
-              </button>
-            )}
           </>
         )}
       </div>

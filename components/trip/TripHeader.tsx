@@ -132,8 +132,7 @@ export function TripHeader({
       <div className="flex-1 min-w-0">
         {isEditing ? (
           <div className="flex items-center gap-2">
-            <input
-              type="text"
+            <Input
               value={tripName}
               onChange={(e) => setTripName(e.target.value)}
               onBlur={handleSave}
@@ -144,7 +143,7 @@ export function TripHeader({
                   setIsEditing(false);
                 }
               }}
-              className="flex-1 bg-transparent text-xl sm:text-2xl font-display font-bold text-ink focus:outline-none focus:ring-2 focus:ring-forest rounded-lg px-2 py-1 leading-tight"
+              className="flex-1 bg-transparent border-transparent px-2 py-1 text-xl sm:text-2xl font-display font-bold leading-tight tracking-[-0.03em] focus-visible:ring-offset-parchment"
               autoFocus
             />
             {isReadOnly && <Badge variant="warning">Read-only</Badge>}
@@ -153,7 +152,8 @@ export function TripHeader({
           <div className="flex items-center gap-2 min-w-0">
             <h1
               className={[
-                'text-xl sm:text-2xl font-display font-bold text-ink leading-tight truncate py-1',
+                // Reserve the same space as the edit Input (border + padding) to avoid layout shift.
+                'text-xl sm:text-2xl font-display font-bold text-ink leading-tight truncate px-2 py-1 border border-transparent rounded-xl',
                 isReadOnly
                   ? 'cursor-default'
                   : 'cursor-pointer hover:text-ink-light transition-colors',
@@ -181,7 +181,7 @@ export function TripHeader({
                   readOnly
                   value=""
                   placeholder="Search…"
-                  className="h-9 pl-9 pr-14 bg-parchment-dark/60 cursor-pointer"
+                  className="h-9 pl-9 pr-14 cursor-pointer bg-parchment-mid border-border/70"
                   onFocus={(e) => {
                     e.currentTarget.blur();
                     onOpenSearch();

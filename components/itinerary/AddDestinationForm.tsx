@@ -99,7 +99,7 @@ export function AddDestinationForm({
           variant="ghost"
           size="sm"
           onClick={() => setMode((prev) => (prev === 'note' ? null : 'note'))}
-          className="w-full gap-2 justify-center min-w-0 sm:flex-1 bg-parchment-dark/40 hover:bg-parchment-dark/70 border border-border/60"
+          className="w-full gap-2 justify-center min-w-0 sm:flex-1"
         >
           <FileText className="h-4 w-4 shrink-0" />
           <span className="min-w-0 whitespace-normal leading-tight">Add Note</span>

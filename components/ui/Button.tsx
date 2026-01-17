@@ -12,7 +12,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         className={cn(
           'inline-flex items-center justify-center rounded-xl font-medium transition-all duration-200 cursor-pointer',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest focus-visible:ring-offset-2 focus-visible:ring-offset-parchment-mid',
           'disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed',
           {
             'bg-terracotta text-white hover:bg-terracotta-light shadow-md hover:shadow-lg': variant === 'primary',
