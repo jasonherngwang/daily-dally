@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useTrip } from '@/hooks/useTrip';
 import { TripHeader } from '@/components/trip/TripHeader';
@@ -10,6 +10,14 @@ import { TripMap } from '@/components/map/TripMap';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { generateId } from '@/lib/ulid';
 import type { Coordinates, Day } from '@/types/trip';
+import { TripSearchModal, type TripSearchSelection } from '@/components/search/TripSearchModal';
+
+function isEditableElement(el: Element | null) {
+  if (!el) return false;
+  const tag = el.tagName?.toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+  return (el as HTMLElement).isContentEditable === true;
+}
 
 export default function TripPage() {
   const params = useParams();
@@ -45,6 +53,9 @@ export default function TripPage() {
     dayId: '',
     id: null,
   });
+
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const pendingScrollRef = useRef<{ dayId: string; destinationId: string } | null>(null);
 
   const previewLocation =
     preview.dayId === activeDayId ? preview.location : null;
@@ -93,6 +104,55 @@ export default function TripPage() {
     setSelected({ dayId: activeDayId, id: null });
     setHovered({ dayId: activeDayId, id: null });
   }, [activeDayId]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.altKey || e.shiftKey) return;
+      if (e.key.toLowerCase() !== 'k') return;
+      const activeEl = document.activeElement;
+      if (isEditableElement(activeEl)) return;
+      e.preventDefault();
+      setIsSearchOpen(true);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const scrollToDestinationCard = useCallback((destinationId: string) => {
+    const el = document.getElementById(`destination-${destinationId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
+  const navigateToDestination = useCallback(
+    (selection: TripSearchSelection) => {
+      if (!trip) return;
+      const { dayId, dayIndex, destinationId } = selection;
+      setSelected({ dayId, id: destinationId });
+      setHovered({ dayId, id: null });
+
+      // If switching days, wait for the next DayEditor mount before scrolling.
+      pendingScrollRef.current = { dayId, destinationId };
+
+      if (dayId !== activeDayId) {
+        router.push(`/trip/${tripToken}?day=${dayIndex}`, { scroll: false });
+      } else {
+        scrollToDestinationCard(destinationId);
+        pendingScrollRef.current = null;
+      }
+
+      setIsSearchOpen(false);
+    },
+    [activeDayId, router, scrollToDestinationCard, trip, tripToken]
+  );
+
+  useEffect(() => {
+    const pending = pendingScrollRef.current;
+    if (!pending) return;
+    if (activeDayId !== pending.dayId) return;
+    scrollToDestinationCard(pending.destinationId);
+    pendingScrollRef.current = null;
+  }, [activeDayId, scrollToDestinationCard]);
 
   const handleDaySelect = (dayId: string) => {
     if (!trip) return;
@@ -228,6 +288,7 @@ export default function TripPage() {
           tripToken={tripToken}
           onUpdate={updateTrip}
           onDelete={handleDeleteTrip}
+          onOpenSearch={() => setIsSearchOpen(true)}
         />
       </div>
 
@@ -281,6 +342,13 @@ export default function TripPage() {
           </div>
         </div>
       )}
+
+      <TripSearchModal
+        open={isSearchOpen}
+        trip={trip}
+        onClose={() => setIsSearchOpen(false)}
+        onSelect={navigateToDestination}
+      />
     </div>
   );
 }
