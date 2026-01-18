@@ -30,6 +30,7 @@ interface DestinationListProps {
   activeDestinationId?: string;
   onSelectDestination?: (destinationId: string) => void;
   readOnly?: boolean;
+  locationBadgeColor?: string;
 }
 
 export function DestinationList({
@@ -41,6 +42,7 @@ export function DestinationList({
   activeDestinationId,
   onSelectDestination,
   readOnly = false,
+  locationBadgeColor,
 }: DestinationListProps) {
   const isDraggingRef = useRef(false);
 
@@ -121,6 +123,7 @@ export function DestinationList({
               <DestinationCard
                 destination={destination}
                 locationNumber={locationNumber}
+                locationBadgeColor={locationBadgeColor}
                 isActive={destination.id === activeDestinationId}
                 readOnly
                 onUpdate={() => {}}
@@ -166,6 +169,7 @@ export function DestinationList({
                 <DestinationCard
                   destination={destination}
                   locationNumber={locationNumber}
+                  locationBadgeColor={locationBadgeColor}
                   isActive={destination.id === activeDestinationId}
                   onUpdate={(updated) => onUpdate(originalIndex, updated)}
                   onDelete={() => onDelete(originalIndex)}

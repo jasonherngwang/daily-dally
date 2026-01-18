@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { PlaceSearch } from './PlaceSearch';
 import type { Destination, PlaceResult } from '@/types/trip';
 import { DiscoverPanel } from './DiscoverPanel';
+import type { ReactNode } from 'react';
 
 interface AddDestinationFormProps {
   onAdd: (destination: Omit<Destination, 'id'>) => void;
@@ -19,6 +20,8 @@ interface AddDestinationFormProps {
     onInsert: (nextDestinations: Destination[]) => void;
     onPreviewLocationChange?: (location: { lat: number; lng: number } | null) => void;
   };
+  actionsTrailing?: ReactNode;
+  actionsBelow?: ReactNode;
 }
 
 type Mode = 'search' | 'discover' | 'note' | null;
@@ -27,6 +30,8 @@ export function AddDestinationForm({
   onAdd,
   locationBias,
   discover,
+  actionsTrailing,
+  actionsBelow,
 }: AddDestinationFormProps) {
   const [mode, setMode] = useState<Mode>(null);
   const [name, setName] = useState('');
@@ -104,7 +109,11 @@ export function AddDestinationForm({
           <FileText className="h-4 w-4 shrink-0" />
           <span className="min-w-0 whitespace-normal leading-tight">Add Note</span>
         </Button>
+
+        {actionsTrailing}
       </div>
+
+      {actionsBelow}
 
       {mode === 'search' && (
         <div className="transition-opacity duration-200 ease-out">
