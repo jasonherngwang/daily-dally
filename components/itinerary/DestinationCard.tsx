@@ -64,6 +64,7 @@ function renderTextWithLinks(text: string): ReactNode {
 interface DestinationCardProps {
   destination: Destination;
   locationNumber?: number;
+  locationBadgeColor?: string;
   isActive?: boolean;
   readOnly?: boolean;
   onUpdate: (updated: Destination) => void;
@@ -74,6 +75,7 @@ interface DestinationCardProps {
 export function DestinationCard({
   destination,
   locationNumber,
+  locationBadgeColor,
   isActive,
   readOnly = false,
   onUpdate,
@@ -189,8 +191,15 @@ export function DestinationCard({
       <div
         className={`
           flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full text-xs sm:text-sm font-bold
-          ${hasLocation ? 'bg-terracotta text-white shadow-sm' : 'bg-border/60 text-ink-light'}
+          ${hasLocation ? 'text-white shadow-sm' : 'bg-border/60 text-ink-light'}
         `}
+        style={
+          hasLocation
+            ? {
+                backgroundColor: locationBadgeColor || '#C4704B',
+              }
+            : undefined
+        }
       >
         {hasLocation ? (
           locationNumber

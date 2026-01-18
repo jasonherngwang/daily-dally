@@ -129,3 +129,13 @@
     background-repeat: repeat;
   }
 }
+
+@media (min-width: 1024px) {
+  .map-sticky-lg {
+    height: var(--mapHeight, calc(100vh - 140px - 48px)) !important;
+    max-height: var(--mapHeight, calc(100vh - 140px - 48px)) !important;
+    min-height: var(--mapHeight, calc(100vh - 140px - 48px)) !important;
+    position: sticky !important;
+    top: var(--mapStickyTop, 140px) !important;
+  }
+}
