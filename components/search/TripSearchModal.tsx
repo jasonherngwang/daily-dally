@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Fuse from 'fuse.js';
 import { FileText, MapPin, Search, X } from 'lucide-react';
 import type { Trip } from '@/types/trip';
 import { Input } from '@/components/ui/Input';
 import { IconButton } from '@/components/ui/IconButton';
+import { useRovingListNavigation } from '@/hooks/useRovingListNavigation';
 
 type TripSearchDoc = {
   tripId: string;
@@ -25,13 +26,6 @@ export type TripSearchSelection = {
   dayIndex: number;
   destinationId: string;
 };
-
-function isEditableElement(el: Element | null) {
-  if (!el) return false;
-  const tag = el.tagName?.toLowerCase();
-  if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
-  return (el as HTMLElement).isContentEditable === true;
-}
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -103,8 +97,12 @@ export function TripSearchModal({
   onSelect: (selection: TripSearchSelection) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const uid = useId();
+  const listboxId = `${uid}-tripsearch-listbox`;
+  const optionId = (idx: number) => `${uid}-tripsearch-opt-${idx}`;
   const [query, setQuery] = useState('');
-  const [activeIndex, setActiveIndex] = useState(0);
 
   const docs: TripSearchDoc[] = useMemo(() => {
     const out: TripSearchDoc[] = [];
@@ -167,42 +165,35 @@ export function TripSearchModal({
     };
   }, [open]);
 
+  const nav = useRovingListNavigation({
+    itemCount: results.length,
+    isOpen: open && results.length > 0,
+    initialActiveIndex: 0,
+    onSelectIndex: (idx) => {
+      const picked = results[clamp(idx, 0, Math.max(0, results.length - 1))];
+      if (!picked) return;
+      onSelect({
+        dayId: picked.item.dayId,
+        dayIndex: picked.item.dayIndex,
+        destinationId: picked.item.destinationId,
+      });
+    },
+    onClose: onClose,
+    loop: false,
+  });
+
   useEffect(() => {
     if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (!open) return;
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-      // Keep keyboard navigation scoped to when focus is within modal.
-      const activeEl = document.activeElement;
-      if (activeEl && !document.getElementById('trip-search-modal')?.contains(activeEl)) return;
+    nav.ensureValidActive();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [results.length, open]);
 
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setActiveIndex((i) => clamp(i + 1, 0, Math.max(0, results.length - 1)));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setActiveIndex((i) => clamp(i - 1, 0, Math.max(0, results.length - 1)));
-      } else if (e.key === 'Enter') {
-        if (results.length === 0) return;
-        if (isEditableElement(activeEl) || activeEl === inputRef.current) {
-          e.preventDefault();
-          const picked = results[clamp(activeIndex, 0, results.length - 1)];
-          if (!picked) return;
-          onSelect({
-            dayId: picked.item.dayId,
-            dayIndex: picked.item.dayIndex,
-            destinationId: picked.item.destinationId,
-          });
-        }
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose, onSelect, results, activeIndex]);
+  useEffect(() => {
+    if (!open) return;
+    if (results.length <= 0) return;
+    const el = nav.itemRefs.current[nav.activeIndex];
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [open, results.length, nav.activeIndex, nav.itemRefs]);
 
   if (!open) return null;
 
@@ -226,10 +217,37 @@ export function TripSearchModal({
 
       <div
         id="trip-search-modal"
+        ref={rootRef}
         role="dialog"
         aria-modal="true"
         aria-label="Search trip"
         className="absolute inset-x-0 top-4 sm:top-10 mx-auto w-[min(720px,calc(100vw-2rem))] rounded-2xl border border-border bg-parchment-mid card-elevated-lg overflow-hidden"
+        onKeyDown={(e) => {
+          // Keep keyboard navigation scoped to when focus is within modal.
+          const activeEl = document.activeElement;
+          if (activeEl && !rootRef.current?.contains(activeEl)) return;
+
+          // Let Esc close even when there are no results.
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            onClose();
+            return;
+          }
+
+          // Space should type into the input, never select a row.
+          if ((e.key === ' ' || e.key === 'Spacebar') && activeEl === inputRef.current) {
+            return;
+          }
+
+          // From the input, ArrowDown should enter the list (focus the active row).
+          if (e.key === 'ArrowDown' && results.length > 0 && activeEl === inputRef.current) {
+            e.preventDefault();
+            nav.focusItem(nav.activeIndex);
+            return;
+          }
+
+          nav.onKeyDown(e);
+        }}
       >
         <div className="flex items-center gap-2 border-b border-border/60 bg-parchment-mid px-3 sm:px-4 py-3">
           <div className="relative flex-1 min-w-0">
@@ -239,10 +257,15 @@ export function TripSearchModal({
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
-                setActiveIndex(0);
+                nav.setActiveIndex(0);
               }}
               placeholder="Search destinations, notes, addresses…"
               className="h-10 pl-10 pr-3"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={results.length > 0}
+              aria-controls={results.length > 0 ? listboxId : undefined}
+              aria-activedescendant={results.length > 0 ? optionId(nav.activeIndex) : undefined}
             />
           </div>
           <IconButton
@@ -261,7 +284,13 @@ export function TripSearchModal({
           <div className="hidden sm:block font-mono">Esc</div>
         </div>
 
-        <div className="max-h-[65vh] overflow-auto px-2 pb-2">
+        <div
+          ref={listRef}
+          className="max-h-[65vh] overflow-auto px-2 pb-2"
+          role="listbox"
+          id={listboxId}
+          aria-label="Search results"
+        >
           {query.trim() && results.length === 0 && (
             <div className="px-3 py-10 text-center text-ink-light text-sm">
               No matches found.
@@ -275,7 +304,7 @@ export function TripSearchModal({
           )}
 
           {results.map((r, idx) => {
-            const isActive = idx === clamp(activeIndex, 0, Math.max(0, results.length - 1));
+            const isActive = idx === clamp(nav.activeIndex, 0, Math.max(0, results.length - 1));
             const matches = r.matches ?? [];
             const nameMatch = matches.find((m) => m.key === 'name');
             const notesMatch = matches.find((m) => m.key === 'notes');
@@ -287,11 +316,16 @@ export function TripSearchModal({
             return (
               <button
                 key={`${r.item.dayId}:${r.item.destinationId}`}
+                ref={(el) => {
+                  nav.itemRefs.current[idx] = el;
+                }}
+                id={optionId(idx)}
                 className={[
                   'w-full text-left rounded-xl border border-transparent px-3 py-3 hover:bg-parchment-dark/50 transition-colors cursor-pointer',
                   isActive ? 'border-forest/30 bg-parchment-dark/70' : '',
                 ].join(' ')}
-                onMouseEnter={() => setActiveIndex(idx)}
+                onMouseEnter={() => nav.setActiveIndex(idx)}
+                onFocus={() => nav.setActiveIndex(idx)}
                 onClick={() =>
                   onSelect({
                     dayId: r.item.dayId,
@@ -299,6 +333,10 @@ export function TripSearchModal({
                     destinationId: r.item.destinationId,
                   })
                 }
+                onKeyDown={nav.onKeyDown}
+                role="option"
+                aria-selected={idx === nav.activeIndex}
+                tabIndex={idx === nav.activeIndex ? 0 : -1}
               >
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 shrink-0 text-ink-light">

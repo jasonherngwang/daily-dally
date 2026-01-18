@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { importLibrary } from '@googlemaps/js-api-loader';
 import { Input } from '@/components/ui/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import type { PlaceResult } from '@/types/trip';
+import { useRovingListNavigation } from '@/hooks/useRovingListNavigation';
 
 interface PlaceSearchProps {
   onPlaceSelect: (place: PlaceResult) => void;
@@ -33,16 +34,18 @@ export function PlaceSearch({
   );
   const [value, setValue] = useState('');
   const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([]);
-  const [isFocused, setIsFocused] = useState(false);
+  const [hasFocusWithin, setHasFocusWithin] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [selectError, setSelectError] = useState<string | null>(null);
 
   const selectableSuggestions = suggestions.filter((s) => !!s.placePrediction);
-  const [activeIndex, setActiveIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const uid = useId();
+  const listboxId = `${uid}-places-listbox`;
+  const optionId = (idx: number) => `${uid}-places-opt-${idx}`;
 
-  const shouldShowDropdown = isFocused && selectableSuggestions.length > 0;
+  const isOpen = hasFocusWithin && selectableSuggestions.length > 0;
 
   const searchTimeoutRef = useRef<number | null>(null);
   const requestSeqRef = useRef(0);
@@ -145,7 +148,7 @@ export function PlaceSearch({
           if (mySeq !== requestSeqRef.current) return;
 
           setSuggestions(nextSuggestions ?? []);
-          setActiveIndex(0);
+          nav.setActiveIndex(0);
         } catch (error) {
           if (mySeq !== requestSeqRef.current) return;
           console.error('Error fetching autocomplete suggestions:', error);
@@ -206,7 +209,7 @@ export function PlaceSearch({
 
       setValue('');
       setSuggestions([]);
-      setIsFocused(false);
+      setHasFocusWithin(false);
     } catch (error) {
       console.error('Error loading place details:', error);
       setSelectError('Could not load place details. Please try again.');
@@ -215,14 +218,47 @@ export function PlaceSearch({
     }
   };
 
+  const closeDropdown = () => {
+    setSuggestions([]);
+    setHasFocusWithin(false);
+  };
+
+  const nav = useRovingListNavigation({
+    itemCount: selectableSuggestions.length,
+    isOpen,
+    initialActiveIndex: 0,
+    onSelectIndex: (idx) => {
+      const picked = selectableSuggestions[idx];
+      if (picked) void selectSuggestion(picked);
+    },
+    onClose: () => {
+      closeDropdown();
+      inputRef.current?.focus();
+    },
+  });
+
   useEffect(() => {
-    if (!shouldShowDropdown) return;
-    const el = itemRefs.current[activeIndex];
+    if (!isOpen) return;
+    const el = nav.itemRefs.current[nav.activeIndex];
     el?.scrollIntoView({ block: 'nearest' });
-  }, [activeIndex, shouldShowDropdown]);
+  }, [isOpen, nav.activeIndex, nav.itemRefs]);
+
+  useEffect(() => {
+    nav.ensureValidActive();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectableSuggestions.length]);
 
   return (
-    <div className="relative">
+    <div
+      ref={rootRef}
+      className="relative"
+      onFocusCapture={() => setHasFocusWithin(true)}
+      onBlurCapture={(e) => {
+        const next = e.relatedTarget as Node | null;
+        if (next && rootRef.current?.contains(next)) return;
+        setHasFocusWithin(false);
+      }}
+    >
       <div className="relative">
         <Input
           ref={inputRef}
@@ -235,7 +271,7 @@ export function PlaceSearch({
               setSuggestions([]);
               setIsSearching(false);
               setSelectError(null);
-              setActiveIndex(0);
+              nav.setActiveIndex(0);
               return;
             }
             setIsSearching(true);
@@ -245,39 +281,41 @@ export function PlaceSearch({
           placeholder={placeholder}
           autoComplete="off"
           spellCheck={false}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => {
-            // Allow click on a result before closing.
-            window.setTimeout(() => setIsFocused(false), 100);
-          }}
           onKeyDown={(e) => {
+            // Space should always type into the input (not select an option).
+            if (e.key === ' ' || e.key === 'Spacebar') return;
+
             if (e.key === 'ArrowDown') {
-              if (!shouldShowDropdown) return;
+              if (!isOpen) return;
               e.preventDefault();
-              setActiveIndex((prev) => (prev + 1) % selectableSuggestions.length);
+              // First ArrowDown from the input moves focus into the active option.
+              nav.focusItem(nav.activeIndex);
               return;
             }
             if (e.key === 'ArrowUp') {
-              if (!shouldShowDropdown) return;
+              if (!isOpen) return;
               e.preventDefault();
-              setActiveIndex((prev) =>
-                (prev - 1 + selectableSuggestions.length) % selectableSuggestions.length
-              );
+              // ArrowUp from input focuses the last enabled option.
+              const last = selectableSuggestions.length - 1;
+              nav.setActiveIndex(last);
+              nav.focusItem(last);
               return;
             }
-            if (e.key === 'Escape') {
-              setSuggestions([]);
-              setIsFocused(false);
-              setActiveIndex(0);
-              inputRef.current?.blur();
-            }
-            if (e.key === 'Enter' && shouldShowDropdown) {
+            if (e.key === 'Enter' && isOpen) {
               e.preventDefault();
-              const picked = selectableSuggestions[activeIndex] ?? selectableSuggestions[0];
+              const picked =
+                selectableSuggestions[nav.activeIndex] ?? selectableSuggestions[0];
               if (picked) void selectSuggestion(picked);
+              return;
             }
+            nav.onKeyDown(e);
           }}
           className="pr-10 bg-parchment-mid border-border/70"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={isOpen}
+          aria-controls={isOpen ? listboxId : undefined}
+          aria-activedescendant={isOpen ? optionId(nav.activeIndex) : undefined}
         />
 
         {(isBootstrapping || isSearching) && (
@@ -287,9 +325,15 @@ export function PlaceSearch({
         )}
       </div>
 
-      {shouldShowDropdown && (
-        <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-border/50 bg-parchment card-elevated">
-          <div ref={listRef} className="max-h-72 overflow-auto">
+      {isOpen && (
+        <div className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-xl border border-border/50 bg-parchment-mid card-elevated">
+          <div
+            ref={listRef}
+            className="max-h-72 overflow-auto"
+            role="listbox"
+            id={listboxId}
+            aria-label="Place suggestions"
+          >
             {selectableSuggestions.map((s, idx) => {
               const p = s.placePrediction;
               if (!p) return null;
@@ -301,18 +345,24 @@ export function PlaceSearch({
                 key={`${p.placeId}-${idx}`}
                 type="button"
                 ref={(el) => {
-                  itemRefs.current[idx] = el;
+                  nav.itemRefs.current[idx] = el;
                 }}
+                id={optionId(idx)}
                 className={[
                   'w-full px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest',
-                  idx === activeIndex ? 'bg-parchment/40' : 'hover:bg-parchment/40',
+                  idx === nav.activeIndex ? 'bg-parchment-dark/50' : 'hover:bg-parchment-dark/40',
                 ].join(' ')}
                 onMouseDown={(e) => {
                   // Prevent input blur before we can select.
                   e.preventDefault();
                 }}
-                onMouseEnter={() => setActiveIndex(idx)}
+                onMouseEnter={() => nav.setActiveIndex(idx)}
+                onFocus={() => nav.setActiveIndex(idx)}
                 onClick={() => void selectSuggestion(s)}
+                onKeyDown={nav.onKeyDown}
+                role="option"
+                aria-selected={idx === nav.activeIndex}
+                tabIndex={idx === nav.activeIndex ? 0 : -1}
               >
                 <div className="text-sm font-medium text-ink">
                   {primary}
