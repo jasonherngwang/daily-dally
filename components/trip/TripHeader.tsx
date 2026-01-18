@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Check,
@@ -50,6 +50,8 @@ export function TripHeader({
   const [showShare, setShowShare] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [recentTrips, setRecentTrips] = useState<RecentTrip[]>(() => getRecentTrips());
+  const shareMenuRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const isReadOnly = accessRole !== 'edit';
   const viewToken = tokens?.viewToken;
@@ -126,6 +128,59 @@ export function TripHeader({
       setIsCloning(false);
     }
   };
+
+  const focusableButtons = (root: HTMLElement | null) => {
+    if (!root) return [] as HTMLButtonElement[];
+    return Array.from(root.querySelectorAll('button'))
+      .filter((b): b is HTMLButtonElement => b instanceof HTMLButtonElement)
+      .filter((b) => !b.disabled && b.tabIndex !== -1);
+  };
+
+  const onMenuKeyDown = (e: ReactKeyboardEvent, close: () => void, root: HTMLElement | null) => {
+    const k = e.key;
+    if (k === 'Escape') {
+      e.preventDefault();
+      close();
+      return;
+    }
+    if (k !== 'ArrowDown' && k !== 'ArrowUp' && k !== 'Home' && k !== 'End') return;
+    const items = focusableButtons(root);
+    if (items.length === 0) return;
+    const active = document.activeElement;
+    const currentIndex = items.findIndex((b) => b === active);
+
+    e.preventDefault();
+    if (k === 'Home') {
+      items[0]?.focus();
+      return;
+    }
+    if (k === 'End') {
+      items[items.length - 1]?.focus();
+      return;
+    }
+    if (k === 'ArrowDown') {
+      const next = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
+      items[next]?.focus();
+      return;
+    }
+    if (k === 'ArrowUp') {
+      const next =
+        currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
+      items[next]?.focus();
+    }
+  };
+
+  useEffect(() => {
+    if (!showShare) return;
+    setTimeout(() => focusableButtons(shareMenuRef.current)[0]?.focus(), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showShare]);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    setTimeout(() => focusableButtons(menuRef.current)[0]?.focus(), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMenu]);
 
   return (
     <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-4">
@@ -229,11 +284,18 @@ export function TripHeader({
                 className="fixed inset-0 z-10"
                 onClick={() => setShowShare(false)}
               />
-              <div className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-border bg-parchment-mid card-elevated z-20 overflow-hidden">
+              <div
+                ref={shareMenuRef}
+                className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-border bg-parchment-mid card-elevated z-20 overflow-hidden"
+                role="menu"
+                aria-label="Share menu"
+                onKeyDown={(e) => onMenuKeyDown(e, () => setShowShare(false), shareMenuRef.current)}
+              >
                 <button
                   onClick={() => handleCopy('view')}
                   disabled={!viewToken}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-parchment transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  role="menuitem"
                 >
                   {copiedKey === 'view' ? (
                     <Check className="h-4 w-4 text-forest" />
@@ -252,6 +314,7 @@ export function TripHeader({
                   <button
                     onClick={() => handleCopy('edit')}
                     className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-parchment transition-colors cursor-pointer"
+                    role="menuitem"
                   >
                     {copiedKey === 'edit' ? (
                       <Check className="h-4 w-4 text-forest" />
@@ -285,13 +348,20 @@ export function TripHeader({
           {showMenu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-parchment-mid card-elevated z-20 overflow-hidden">
+              <div
+                ref={menuRef}
+                className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-border bg-parchment-mid card-elevated z-20 overflow-hidden"
+                role="menu"
+                aria-label="Trip menu"
+                onKeyDown={(e) => onMenuKeyDown(e, () => setShowMenu(false), menuRef.current)}
+              >
                 <button
                   onClick={() => {
                     setShowMenu(false);
                     router.push('/');
                   }}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-ink hover:bg-parchment transition-colors cursor-pointer"
+                  role="menuitem"
                 >
                   <Home className="h-4 w-4 text-ink-light" />
                   Home
@@ -319,6 +389,7 @@ export function TripHeader({
                             setShowMenu(false);
                             router.push(`/trip/${t.token}`);
                           }}
+                          role="menuitem"
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <div className="text-sm text-ink truncate">{t.name}</div>
@@ -338,6 +409,7 @@ export function TripHeader({
                             e.stopPropagation();
                             await handleCopyTripLink(t.token);
                           }}
+                          role="menuitem"
                         >
                           <Copy className="h-4 w-4 text-ink-light" />
                         </button>
@@ -349,6 +421,7 @@ export function TripHeader({
                             removeRecentTrip(t.token);
                             setRecentTrips(getRecentTrips());
                           }}
+                          role="menuitem"
                         >
                           <X className="h-4 w-4 text-ink-light" />
                         </button>
@@ -361,6 +434,7 @@ export function TripHeader({
                         clearRecentTrips();
                         setRecentTrips([]);
                       }}
+                      role="menuitem"
                     >
                       <Trash2 className="h-4 w-4" />
                       Clear recents
@@ -373,6 +447,7 @@ export function TripHeader({
                   onClick={handleCloneTrip}
                   disabled={isCloning}
                   className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-ink hover:bg-parchment transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  role="menuitem"
                 >
                   <Copy className="h-4 w-4" />
                   {isCloning ? 'Cloning…' : 'Clone trip'}
@@ -384,6 +459,7 @@ export function TripHeader({
                     <button
                       onClick={handleDelete}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 hover:bg-parchment transition-colors cursor-pointer"
+                      role="menuitem"
                     >
                       <Trash2 className="h-4 w-4" />
                       Delete Trip
