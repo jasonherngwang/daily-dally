@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
 import { getGoogleMapsNavigationUrl } from '@/lib/navigation';
 import type { Destination } from '@/types/trip';
+import { useRovingListNavigation } from '@/hooks/useRovingListNavigation';
 
 const URL_REGEX = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/g;
 const TRAILING_PUNCT = new Set([',', '.', ';', ':', '!', '?', ')', ']', '}', '"', "'"]);
@@ -84,6 +85,7 @@ export function DestinationCard({
   const [notes, setNotes] = useState(destination.notes);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuRootRef = useRef<HTMLDivElement | null>(null);
 
   const hasLocation = !!destination.location;
   const navigationUrl = hasLocation ? getGoogleMapsNavigationUrl(destination) : null;
@@ -109,6 +111,29 @@ export function DestinationCard({
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [menuOpen]);
+
+  const menuNav = useRovingListNavigation({
+    itemCount: 2,
+    isOpen: menuOpen,
+    initialActiveIndex: 0,
+    onSelectIndex: (idx) => {
+      if (idx === 0) {
+        setMenuOpen(false);
+        onMove?.();
+      } else if (idx === 1) {
+        setMenuOpen(false);
+        onDelete();
+      }
+    },
+    onClose: () => setMenuOpen(false),
+    loop: true,
+  });
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    // Focus first item for immediate arrow-key use.
+    setTimeout(() => menuNav.focusItem(menuNav.activeIndex), 0);
+  }, [menuOpen, menuNav]);
 
   const {
     attributes,
@@ -266,10 +291,16 @@ export function DestinationCard({
 
                       {menuOpen && (
                         <div
+                          ref={menuRootRef}
                           className="absolute right-0 top-9 z-50 w-44 rounded-xl border border-border/70 bg-parchment-mid card-elevated overflow-hidden"
                           role="menu"
                           onPointerDown={(e) => e.stopPropagation()}
                           onTouchStart={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            const activeEl = document.activeElement;
+                            if (activeEl && !menuRootRef.current?.contains(activeEl)) return;
+                            menuNav.onKeyDown(e);
+                          }}
                         >
                           <button
                             className="w-full text-left px-3 py-2 text-sm hover:bg-parchment-dark/70 transition-colors flex items-center gap-2"
@@ -278,6 +309,12 @@ export function DestinationCard({
                               setMenuOpen(false);
                               onMove?.();
                             }}
+                            ref={(el) => {
+                              menuNav.itemRefs.current[0] = el;
+                            }}
+                            onFocus={() => menuNav.setActiveIndex(0)}
+                            onMouseEnter={() => menuNav.setActiveIndex(0)}
+                            tabIndex={menuNav.activeIndex === 0 ? 0 : -1}
                           >
                             <ArrowLeftRight className="h-4 w-4 text-ink-light" />
                             <span>Move to…</span>
@@ -290,6 +327,12 @@ export function DestinationCard({
                               setMenuOpen(false);
                               onDelete();
                             }}
+                            ref={(el) => {
+                              menuNav.itemRefs.current[1] = el;
+                            }}
+                            onFocus={() => menuNav.setActiveIndex(1)}
+                            onMouseEnter={() => menuNav.setActiveIndex(1)}
+                            tabIndex={menuNav.activeIndex === 1 ? 0 : -1}
                           >
                             <Trash2 className="h-4 w-4 text-red-700" />
                             <span className="text-red-700">Delete</span>
