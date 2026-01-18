@@ -28,6 +28,8 @@
 @layer base {
   html {
     font-family: var(--font-body);
+    /* Force UA widgets (form controls/scrollbars) to render in light mode. */
+    color-scheme: light;
     background-color: var(--color-parchment);
     color: var(--color-ink);
     line-height: 1.7;
@@ -41,6 +43,14 @@
   }
 
   body {
+    /*
+      Explicitly paint the page background on <body> too.
+      Some mobile browsers can show a dark "canvas" during overscroll/viewport gaps
+      if only <html> has a background set.
+    */
+    background-color: var(--color-parchment);
+    color: var(--color-ink);
+    min-height: 100vh;
     max-width: 100vw;
     overflow-x: hidden;
   }
