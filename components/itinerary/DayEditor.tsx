@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { DestinationList } from './DestinationList';
 import { AddDestinationForm } from './AddDestinationForm';
-import { Trash2 } from 'lucide-react';
+import { ChevronDown, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { Input } from '@/components/ui/Input';
 import { generateId } from '@/lib/ulid';
 import { MoveToDayModal } from '@/components/itinerary/MoveToDayModal';
@@ -22,6 +23,11 @@ interface DayEditorProps {
   activeDestinationId?: string;
   onSelectDestination?: (destinationId: string) => void;
   readOnly?: boolean;
+  locationBadgeColor?: string;
+  collapsible?: {
+    isOpen: boolean;
+    onToggle: () => void;
+  };
 }
 
 export function DayEditor({
@@ -36,6 +42,8 @@ export function DayEditor({
   activeDestinationId,
   onSelectDestination,
   readOnly = false,
+  locationBadgeColor,
+  collapsible,
 }: DayEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editLabel, setEditLabel] = useState('');
@@ -70,8 +78,8 @@ export function DayEditor({
   };
 
   return (
-    <div className="space-y-4 min-w-0">
-      <div className="flex items-center justify-between gap-3 min-w-0">
+    <div className="space-y-2 sm:space-y-4 min-w-0">
+      <div className="flex items-center justify-between gap-2 sm:gap-3 min-w-0">
         <div className="min-w-0 flex-1">
           {isEditing ? (
             <div className="flex items-center gap-2">
@@ -86,32 +94,60 @@ export function DayEditor({
               />
             </div>
           ) : (
-            <button
-              type="button"
-              className={[
-                // Match TripHeader title inset so entering edit mode doesn't feel like the text moved.
-                'h-9 font-display font-semibold text-lg sm:text-xl text-ink truncate text-left px-2 py-1 border border-transparent rounded-xl leading-tight',
-                readOnly
-                  ? 'cursor-default'
-                  : 'cursor-pointer hover:text-forest transition-colors',
-              ].join(' ')}
-              onClick={handleStartEdit}
-              title={readOnly ? undefined : 'Click to rename'}
-              disabled={readOnly}
-            >
-              {day.label}
-            </button>
+            <div className="flex items-center gap-0.5 sm:gap-1.5 min-w-0">
+              {collapsible && (
+                <button
+                  type="button"
+                  className="h-7 w-7 sm:h-9 sm:w-9 shrink-0 rounded-xl border border-transparent hover:bg-parchment-mid/60 flex items-center justify-center cursor-pointer"
+                  onClick={collapsible.onToggle}
+                  aria-label={collapsible.isOpen ? 'Collapse day' : 'Expand day'}
+                  title={collapsible.isOpen ? 'Collapse' : 'Expand'}
+                >
+                  <ChevronDown
+                    className={[
+                      'h-3.5 w-3.5 sm:h-4 sm:w-4 text-ink-light transition-transform duration-200',
+                      collapsible.isOpen ? 'rotate-180' : 'rotate-0',
+                    ].join(' ')}
+                  />
+                </button>
+              )}
+              <button
+                type="button"
+                className={[
+                  // Match TripHeader title inset so entering edit mode doesn't feel like the text moved.
+                  'h-7 sm:h-9 font-display font-semibold text-base sm:text-xl text-ink truncate text-left pl-1 pr-2 py-1 border border-transparent rounded-xl leading-tight min-w-0 flex-1',
+                  readOnly
+                    ? 'cursor-default'
+                    : 'cursor-pointer hover:text-forest transition-colors',
+                ].join(' ')}
+                onClick={() => {
+                  // On mobile, if card is closed, open it instead of editing
+                  if (collapsible && !collapsible.isOpen) {
+                    collapsible.onToggle();
+                  } else {
+                    handleStartEdit();
+                  }
+                }}
+                title={
+                  readOnly
+                    ? undefined
+                    : collapsible && !collapsible.isOpen
+                      ? 'Tap to expand'
+                      : 'Click to rename'
+                }
+                disabled={readOnly}
+              >
+                {day.label}
+              </button>
+            </div>
           )}
         </div>
-
-        {!readOnly && (
-          <Button
+        {!readOnly && canDeleteDay && (!collapsible || collapsible.isOpen) && (
+          <IconButton
             variant="ghost"
             size="sm"
-            className="gap-2 text-ink-light hover:text-red-700 focus-visible:text-red-700 active:text-red-700"
-            disabled={!canDeleteDay}
+            className="sm:hidden shrink-0 h-7 w-7 border border-border/50 hover:border-border text-ink-light hover:text-red-700"
             onClick={() => {
-              if (!canDeleteDay) return;
               const ok = confirm(
                 `Delete ${day.label}? This will remove the entire day and its destinations. This action cannot be undone.`
               );
@@ -123,69 +159,99 @@ export function DayEditor({
                 ? 'You need at least one day in a trip'
                 : 'Delete this day'
             }
+            aria-label="Delete day"
           >
-            <Trash2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Delete day</span>
-          </Button>
+            <Trash2 className="h-3.5 w-3.5" />
+          </IconButton>
         )}
       </div>
 
-      {!readOnly && (
-        <AddDestinationForm
-          locationBias={
-            day.destinations.length > 0
-              ? day.destinations
-                  .filter((d) => d.location)
-                  .slice(-1)[0]?.location
-              : undefined
+      <div className={collapsible && !collapsible.isOpen ? 'hidden' : 'block'}>
+        {!readOnly && (
+          <AddDestinationForm
+            locationBias={
+              day.destinations.length > 0
+                ? day.destinations
+                    .filter((d) => d.location)
+                    .slice(-1)[0]?.location
+                : undefined
+            }
+            discover={{
+              tripToken,
+              dayId: day.id,
+              destinations: day.destinations,
+              onPreviewLocationChange,
+              onInsert: (nextDestinations) => {
+                if (readOnly) return;
+                onUpdate({ ...day, destinations: nextDestinations });
+              },
+            }}
+          actionsTrailing={
+            !readOnly ? (
+              <IconButton
+                variant="ghost"
+                size="sm"
+                className="hidden sm:flex shrink-0 h-9 w-9 border border-border/50 hover:border-border text-ink-light hover:text-red-700"
+                disabled={!canDeleteDay}
+                onClick={() => {
+                  if (!canDeleteDay) return;
+                  const ok = confirm(
+                    `Delete ${day.label}? This will remove the entire day and its destinations. This action cannot be undone.`
+                  );
+                  if (!ok) return;
+                  onDeleteDay?.(day.id);
+                }}
+                title={
+                  trip.days.length <= 1
+                    ? 'You need at least one day in a trip'
+                    : 'Delete this day'
+                }
+                aria-label="Delete day"
+              >
+                <Trash2 className="h-4 w-4" />
+              </IconButton>
+            ) : null
           }
-          discover={{
-            tripToken,
-            dayId: day.id,
-            destinations: day.destinations,
-            onPreviewLocationChange,
-            onInsert: (nextDestinations) => {
-              if (readOnly) return;
-              onUpdate({ ...day, destinations: nextDestinations });
-            },
+          actionsBelow={null}
+            onAdd={(destination) => {
+              onUpdate({
+                ...day,
+                destinations: [
+                  ...day.destinations,
+                  { ...destination, id: generateId() },
+                ],
+              });
+            }}
+          />
+        )}
+
+        <DestinationList
+          destinations={day.destinations}
+          readOnly={readOnly}
+          locationBadgeColor={locationBadgeColor}
+          activeDestinationId={activeDestinationId}
+          onSelectDestination={onSelectDestination}
+          onReorder={(destinations) => {
+            if (readOnly) return;
+            onUpdate({ ...day, destinations });
           }}
-          onAdd={(destination) => {
-            onUpdate({
-              ...day,
-              destinations: [
-                ...day.destinations,
-                { ...destination, id: generateId() },
-              ],
-            });
+          onUpdate={(index, destination) => {
+            if (readOnly) return;
+            const updated = [...day.destinations];
+            updated[index] = destination;
+            onUpdate({ ...day, destinations: updated });
+          }}
+          onDelete={(index) => {
+            if (readOnly) return;
+            const updated = day.destinations.filter((_, i) => i !== index);
+            onUpdate({ ...day, destinations: updated });
+          }}
+          onMove={(destinationId) => {
+            if (readOnly) return;
+            setMoveDestinationId(destinationId);
           }}
         />
-      )}
-
-      <DestinationList
-        destinations={day.destinations}
-        readOnly={readOnly}
-        activeDestinationId={activeDestinationId}
-        onSelectDestination={onSelectDestination}
-        onReorder={(destinations) => {
-          if (readOnly) return;
-          onUpdate({ ...day, destinations });
-        }}
-        onUpdate={(index, destination) => {
-          if (readOnly) return;
-          const updated = [...day.destinations];
-          updated[index] = destination;
-          onUpdate({ ...day, destinations: updated });
-        }}
-        onDelete={(index) => {
-          if (readOnly) return;
-          const updated = day.destinations.filter((_, i) => i !== index);
-          onUpdate({ ...day, destinations: updated });
-        }}
-        onMove={(destinationId) => {
-          if (readOnly) return;
-          setMoveDestinationId(destinationId);
-        }}
-      />
+      </div>
 
       <MoveToDayModal
         open={!readOnly && moveDestinationId != null}

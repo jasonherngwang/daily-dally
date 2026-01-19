@@ -4,9 +4,21 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { importLibrary } from "@googlemaps/js-api-loader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import type { Destination } from "@/types/trip";
+import { darkenHex, distinctRouteColor } from "@/lib/route-colors";
+
+export interface TripMapRoute {
+  id: string; // stable id (e.g. dayId)
+  label?: string;
+  dayIndex?: number;
+  destinations: Destination[];
+  color?: string;
+}
 
 interface TripMapProps {
-  destinations: Destination[];
+  // Day View (legacy): single list of destinations
+  destinations?: Destination[];
+  // Trip View: multiple per-day routes
+  routes?: TripMapRoute[];
   activeDestinationId?: string;
   onDestinationClick?: (id: string) => void;
   onDestinationHover?: (id: string | null) => void;
@@ -14,8 +26,10 @@ interface TripMapProps {
   previewLocation?: { lat: number; lng: number } | null;
 }
 
+
 export function TripMap({
-  destinations,
+  destinations = [],
+  routes,
   activeDestinationId,
   onDestinationClick,
   onDestinationHover,
@@ -26,20 +40,25 @@ export function TripMap({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
-  const markersRef = useRef<
-    (google.maps.marker.AdvancedMarkerElement | google.maps.Marker)[]
-  >([]);
+  type MarkerEntry = {
+    destinationId: string;
+    marker: google.maps.marker.AdvancedMarkerElement | google.maps.Marker;
+    number: number;
+    color: string;
+    activeColor?: string;
+  };
+  const markersRef = useRef<MarkerEntry[]>([]);
   const directionsServiceRef = useRef<google.maps.DirectionsService | null>(
     null
   );
-  const directionsRendererRef = useRef<google.maps.DirectionsRenderer | null>(
-    null
+  const directionsRenderersRef = useRef<Map<string, google.maps.DirectionsRenderer>>(
+    new Map()
   );
   const previewMarkerRef = useRef<google.maps.Marker | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<Error | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
-  const destinationsKeyRef = useRef<string>("");
+  const routesKeyRef = useRef<string>("");
 
   const hasValidLocation = useCallback(
     (d: Destination) =>
@@ -49,18 +68,77 @@ export function TripMap({
     []
   );
 
-  const destinationsKey = useMemo(() => {
-    // Include order + coordinates so any route/order change triggers a refresh.
-    const withLocation = destinations.filter(hasValidLocation);
-    return withLocation
-      .map((d) => `${d.id}:${d.location!.lat},${d.location!.lng}`)
-      .join("|");
-  }, [destinations, hasValidLocation]);
+  const normalizedRoutes: Array<{
+    id: string;
+    label?: string;
+    color: string;
+    activeColor?: string;
+    destinations: Destination[];
+  }> = useMemo(() => {
+    if (routes && routes.length > 0) {
+      return routes.map((r, idx) => {
+        const colorIndex = r.dayIndex ?? idx;
+        const fallbackColor = distinctRouteColor(colorIndex);
+        return {
+          id: r.id,
+          label: r.label,
+          color: r.color || fallbackColor,
+          destinations: r.destinations ?? [],
+        };
+      });
+    }
+    return [
+      {
+        id: "active-day",
+        label: undefined,
+        // Preserve legacy Day View styling:
+        // - inactive markers: terracotta
+        // - active marker: forest
+        color: "#C4704B",
+        activeColor: "#2D5A45",
+        destinations,
+      },
+    ];
+  }, [routes, destinations]);
 
-  const destinationsWithLocation = useMemo(
-    () => destinations.filter(hasValidLocation),
-    [destinations, hasValidLocation]
-  );
+  const routesKey = useMemo(() => {
+    // Include route ids + order + coordinates so any route/order change triggers a refresh.
+    return normalizedRoutes
+      .map((r) => {
+        const withLocation = r.destinations.filter(hasValidLocation);
+        const coords = withLocation
+          .map((d) => `${d.id}:${d.location!.lat},${d.location!.lng}`)
+          .join("|");
+        return `${r.id}::${coords}`;
+      })
+      .join("||");
+  }, [normalizedRoutes, hasValidLocation]);
+
+  const destinationsWithMeta = useMemo(() => {
+    // Flatten per route; numbering is per-route (per day) and only counts items with locations.
+    const out: Array<{
+      destination: Destination;
+      number: number;
+      color: string;
+      activeColor?: string;
+      routeId: string;
+    }> = [];
+    for (const r of normalizedRoutes) {
+      let counter = 0;
+      for (const d of r.destinations) {
+        if (!hasValidLocation(d)) continue;
+        counter += 1;
+        out.push({
+          destination: d,
+          number: counter,
+          color: r.color,
+          activeColor: r.activeColor,
+          routeId: r.id,
+        });
+      }
+    }
+    return out;
+  }, [normalizedRoutes, hasValidLocation]);
 
   const handleDestinationClick = useCallback(
     (id: string) => {
@@ -111,15 +189,6 @@ export function TripMap({
 
           mapInstanceRef.current = map;
           directionsServiceRef.current = new DirectionsService();
-          directionsRendererRef.current = new DirectionsRenderer({
-            map,
-            suppressMarkers: true,
-            polylineOptions: {
-              strokeColor: "#2D5A45",
-              strokeWeight: 4,
-              strokeOpacity: 0.8,
-            },
-          });
         }
 
         // Map background click clears selection (but avoid duplicate listeners).
@@ -145,17 +214,13 @@ export function TripMap({
 
     return () => {
       if (mapInstanceRef.current) {
-        markersRef.current.forEach((marker) => {
-          if (isLegacyMarker(marker)) {
-            marker.setMap(null);
-          } else {
-            marker.map = null;
-          }
+        markersRef.current.forEach(({ marker }) => {
+          if (isLegacyMarker(marker)) marker.setMap(null);
+          else marker.map = null;
         });
         markersRef.current = [];
-        if (directionsRendererRef.current) {
-          directionsRendererRef.current.setMap(null);
-        }
+        directionsRenderersRef.current.forEach((r) => r.setMap(null));
+        directionsRenderersRef.current.clear();
         if (previewMarkerRef.current) {
           previewMarkerRef.current.setMap(null);
           previewMarkerRef.current = null;
@@ -166,7 +231,6 @@ export function TripMap({
         }
         mapInstanceRef.current = null;
         directionsServiceRef.current = null;
-        directionsRendererRef.current = null;
       }
     };
   }, []);
@@ -176,7 +240,7 @@ export function TripMap({
     const map = mapInstanceRef.current;
     if (!map || !isMapReady) return;
     if (!activeDestinationId) return;
-    const d = destinationsWithLocation.find((x) => x.id === activeDestinationId);
+    const d = destinationsWithMeta.find((x) => x.destination.id === activeDestinationId)?.destination;
     if (!d?.location) return;
     const latLng = new google.maps.LatLng(d.location.lat, d.location.lng);
     const bounds = map.getBounds();
@@ -185,7 +249,7 @@ export function TripMap({
     if ((map.getZoom() ?? 0) < 12) {
       map.setZoom(12);
     }
-  }, [activeDestinationId, destinationsWithLocation, isMapReady]);
+  }, [activeDestinationId, destinationsWithMeta, isMapReady]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -195,7 +259,7 @@ export function TripMap({
             google.maps.event.trigger(mapInstanceRef.current, "resize");
             if (markersRef.current.length > 0) {
               const bounds = new google.maps.LatLngBounds();
-              markersRef.current.forEach((marker) => {
+              markersRef.current.forEach(({ marker }) => {
                 const pos = getMarkerPosition(marker);
                 if (!pos) return;
                 bounds.extend(pos);
@@ -271,8 +335,44 @@ export function TripMap({
     }
   }, [previewLocation, isMapReady]);
 
-  function requestDirections(dests: Destination[]) {
-    if (!directionsServiceRef.current || !directionsRendererRef.current) return;
+  function ensureDirectionsRenderer(routeId: string, strokeColor: string) {
+    if (!mapInstanceRef.current) return null;
+    const existing = directionsRenderersRef.current.get(routeId);
+    if (existing) {
+      existing.setOptions({
+        polylineOptions: {
+          strokeColor,
+          strokeWeight: 4,
+          strokeOpacity: 0.8,
+        },
+      });
+      return existing;
+    }
+    const renderer = new google.maps.DirectionsRenderer({
+      map: mapInstanceRef.current,
+      suppressMarkers: true,
+      preserveViewport: true,
+      polylineOptions: {
+        strokeColor,
+        strokeWeight: 4,
+        strokeOpacity: 0.8,
+      },
+    });
+    directionsRenderersRef.current.set(routeId, renderer);
+    return renderer;
+  }
+
+  function removeDirectionsRenderer(routeId: string) {
+    const existing = directionsRenderersRef.current.get(routeId);
+    if (!existing) return;
+    existing.setMap(null);
+    directionsRenderersRef.current.delete(routeId);
+  }
+
+  function requestDirections(routeId: string, dests: Destination[], strokeColor: string) {
+    if (!directionsServiceRef.current) return;
+    const renderer = ensureDirectionsRenderer(routeId, strokeColor);
+    if (!renderer) return;
 
     const waypoints = dests.slice(1, -1).map((d) => ({
       location: new google.maps.LatLng(d.location!.lat, d.location!.lng),
@@ -298,9 +398,9 @@ export function TripMap({
       (result, status) => {
         if (
           status === google.maps.DirectionsStatus.OK &&
-          directionsRendererRef.current
+          renderer
         ) {
-          directionsRendererRef.current.setDirections(result);
+          renderer.setDirections(result);
         }
       }
     );
@@ -320,73 +420,68 @@ export function TripMap({
         }
       }, 100);
 
-      if (destinationsWithLocation.length === 0) {
-        markersRef.current.forEach((marker) => {
-          if (isLegacyMarker(marker)) {
-            marker.setMap(null);
-          } else {
-            marker.map = null;
-          }
+      if (destinationsWithMeta.length === 0) {
+        markersRef.current.forEach(({ marker }) => {
+          if (isLegacyMarker(marker)) marker.setMap(null);
+          else marker.map = null;
         });
         markersRef.current = [];
-        if (directionsRendererRef.current) {
-          directionsRendererRef.current.setMap(null);
-          directionsRendererRef.current.setMap(mapInstanceRef.current);
-        }
+        directionsRenderersRef.current.forEach((r) => r.setMap(null));
+        directionsRenderersRef.current.clear();
         return;
       }
 
-      const currentKey = destinationsKey;
+      const currentKey = routesKey;
       if (
-        destinationsKeyRef.current === currentKey &&
-        markersRef.current.length === destinationsWithLocation.length
+        routesKeyRef.current === currentKey &&
+        markersRef.current.length === destinationsWithMeta.length
       ) {
         // Still ensure directions are in sync (cheap, and avoids stale polylines).
-        if (
-          destinationsWithLocation.length >= 2 &&
-          directionsServiceRef.current &&
-          directionsRendererRef.current
-        ) {
-          requestDirections(destinationsWithLocation);
+        for (const r of normalizedRoutes) {
+          const withLoc = r.destinations.filter(hasValidLocation);
+          if (withLoc.length >= 2) {
+            requestDirections(r.id, withLoc, r.color);
+          } else {
+            removeDirectionsRenderer(r.id);
+          }
         }
         return;
       }
 
-      destinationsKeyRef.current = currentKey;
+      routesKeyRef.current = currentKey;
 
-      markersRef.current.forEach((marker) => {
-        if (isLegacyMarker(marker)) {
-          marker.setMap(null);
-        } else {
-          marker.map = null;
-        }
+      markersRef.current.forEach(({ marker }) => {
+        if (isLegacyMarker(marker)) marker.setMap(null);
+        else marker.map = null;
       });
       markersRef.current = [];
 
-      if (directionsRendererRef.current && mapInstanceRef.current) {
-        directionsRendererRef.current.setMap(null);
-        directionsRendererRef.current.setMap(mapInstanceRef.current);
-      }
+      // Remove renderers for routes that no longer exist.
+      const routeIds = new Set(normalizedRoutes.map((r) => r.id));
+      directionsRenderersRef.current.forEach((renderer, routeId) => {
+        if (!routeIds.has(routeId)) {
+          renderer.setMap(null);
+          directionsRenderersRef.current.delete(routeId);
+        }
+      });
 
-      const markers: (
-        | google.maps.marker.AdvancedMarkerElement
-        | google.maps.Marker
-      )[] = [];
+      const markerEntries: MarkerEntry[] = [];
       const advanced = mapId
         ? ((await importLibrary("marker")) as unknown as {
             AdvancedMarkerElement: typeof google.maps.marker.AdvancedMarkerElement;
           })
         : null;
 
-      destinationsWithLocation.forEach((destination, index) => {
-        if (!destination.location) return;
-
+      destinationsWithMeta.forEach((entry) => {
+        const destination = entry.destination;
         const isActive = destination.id === activeDestinationId;
         const position = {
-          lat: destination.location.lat,
-          lng: destination.location.lng,
+          lat: destination.location!.lat,
+          lng: destination.location!.lng,
         };
-        const zIndex = isActive ? 1_000_000 : index + 1;
+        const zIndex = isActive ? 1_000_000 : entry.number + 1;
+        const baseColor = entry.color;
+        const activeColor = entry.activeColor;
 
         let marker:
           | google.maps.marker.AdvancedMarkerElement
@@ -397,7 +492,7 @@ export function TripMap({
             position,
             map: mapInstanceRef.current!,
             title: destination.name,
-            content: createCustomMarkerContent(index + 1, isActive),
+            content: createCustomMarkerContent(entry.number, baseColor, isActive, activeColor),
             zIndex,
           });
 
@@ -416,10 +511,10 @@ export function TripMap({
             position,
             map: mapInstanceRef.current!,
             title: destination.name,
-            icon: createCustomMarkerIcon(index + 1, isActive),
+            icon: createCustomMarkerIcon(entry.number, baseColor, isActive, activeColor),
             zIndex,
             label: {
-              text: String(index + 1),
+              text: String(entry.number),
               color: "white",
               fontSize: "14px",
               fontWeight: "bold",
@@ -433,14 +528,20 @@ export function TripMap({
           marker.addListener("mouseout", () => handleDestinationHover(null));
         }
 
-        markers.push(marker);
+        markerEntries.push({
+          destinationId: destination.id,
+          marker,
+          number: entry.number,
+          color: baseColor,
+          activeColor,
+        });
       });
 
-      markersRef.current = markers;
+      markersRef.current = markerEntries;
 
-      if (markers.length > 0) {
+      if (markerEntries.length > 0) {
         const bounds = new google.maps.LatLngBounds();
-        markers.forEach((marker) => {
+        markerEntries.forEach(({ marker }) => {
           const pos = getMarkerPosition(marker);
           if (!pos) return;
           bounds.extend(pos);
@@ -448,43 +549,49 @@ export function TripMap({
         mapInstanceRef.current.fitBounds(bounds, 50);
       }
 
-      if (
-        destinationsWithLocation.length >= 2 &&
-        directionsServiceRef.current &&
-        directionsRendererRef.current
-      ) {
-        requestDirections(destinationsWithLocation);
+      for (const r of normalizedRoutes) {
+        const withLoc = r.destinations.filter(hasValidLocation);
+        if (withLoc.length >= 2) {
+          requestDirections(r.id, withLoc, r.color);
+        } else {
+          removeDirectionsRenderer(r.id);
+        }
       }
     };
 
     updateMarkers();
   }, [
     isMapReady,
-    destinationsKey,
-    destinationsWithLocation,
-    destinations.length,
+    routesKey,
+    destinationsWithMeta,
+    normalizedRoutes,
     activeDestinationId,
     handleDestinationClick,
+    hasValidLocation,
   ]);
 
   useEffect(() => {
     if (!mapInstanceRef.current || markersRef.current.length === 0) return;
 
-    markersRef.current.forEach((marker, index) => {
-      const destination = destinationsWithLocation[index];
-      if (!destination) return;
-
-      const isActive = destination.id === activeDestinationId;
-      const zIndex = isActive ? 1_000_000 : index + 1;
-      if (isLegacyMarker(marker)) {
-        marker.setIcon(createCustomMarkerIcon(index + 1, isActive));
-        marker.setZIndex(zIndex);
+    markersRef.current.forEach((entry) => {
+      const isActive = entry.destinationId === activeDestinationId;
+      const zIndex = isActive ? 1_000_000 : entry.number + 1;
+      if (isLegacyMarker(entry.marker)) {
+        entry.marker.setIcon(
+          createCustomMarkerIcon(entry.number, entry.color, isActive, entry.activeColor)
+        );
+        entry.marker.setZIndex(zIndex);
       } else {
-        marker.content = createCustomMarkerContent(index + 1, isActive);
-        marker.zIndex = zIndex;
+        entry.marker.content = createCustomMarkerContent(
+          entry.number,
+          entry.color,
+          isActive,
+          entry.activeColor
+        );
+        entry.marker.zIndex = zIndex;
       }
     });
-  }, [activeDestinationId, destinationsWithLocation]);
+  }, [activeDestinationId]);
 
   if (loadError) {
     return (
@@ -496,10 +603,32 @@ export function TripMap({
     );
   }
 
-  const showEmptyState = destinationsWithLocation.length === 0;
+  const showEmptyState = destinationsWithMeta.length === 0;
+  const showLegend = (routes?.length ?? 0) > 0;
 
   return (
     <div className="relative h-full w-full rounded-xl overflow-hidden border border-border/50 card-elevated">
+      {showLegend && (
+        <div className="absolute left-3 top-3 z-20 max-w-[70%] rounded-xl border border-border/70 bg-parchment/80 backdrop-blur-md px-3 py-2">
+          <div className="text-[11px] font-semibold text-ink-light uppercase tracking-wide">
+            Routes
+          </div>
+          <div className="mt-1 space-y-1">
+            {normalizedRoutes.map((r, idx) => (
+              <div key={r.id} className="flex items-center gap-2 text-xs text-ink">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full border border-white/70"
+                  style={{ backgroundColor: r.color }}
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 truncate">
+                  {r.label || `Day ${idx + 1}`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {showEmptyState && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-parchment-dark/80 backdrop-blur-sm">
           <p className="text-ink-light text-center px-6 text-base">
@@ -522,10 +651,12 @@ export function TripMap({
 
 function createCustomMarkerContent(
   number: number,
-  isActive: boolean
+  baseColor: string,
+  isActive: boolean,
+  activeColor?: string
 ): HTMLElement {
   const size = isActive ? 44 : 36;
-  const color = isActive ? "#2D5A45" : "#C4704B";
+  const color = isActive ? activeColor || darkenHex(baseColor, 0.12) : baseColor;
 
   const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
     <circle cx="${size / 2}" cy="${size / 2}" r="${
@@ -546,10 +677,12 @@ function createCustomMarkerContent(
 
 function createCustomMarkerIcon(
   number: number,
-  isActive: boolean
+  baseColor: string,
+  isActive: boolean,
+  activeColor?: string
 ): google.maps.Icon {
   const size = isActive ? 44 : 36;
-  const color = isActive ? "#2D5A45" : "#C4704B";
+  const color = isActive ? activeColor || darkenHex(baseColor, 0.12) : baseColor;
 
   const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
     <circle cx="${size / 2}" cy="${size / 2}" r="${
