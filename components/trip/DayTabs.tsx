@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { LayoutList, Plus } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
 import type { Day } from '@/types/trip';
 import {
@@ -25,6 +25,8 @@ interface DayTabsProps {
   days: Day[];
   activeDayId: string;
   onDaySelect: (dayId: string) => void;
+  onTripViewSelect?: () => void;
+  tripViewActive?: boolean;
   onAddDay: () => void;
   onReorderDay?: (dayId: string, direction: 'left' | 'right') => void; // Keeping for compatibility, but unused
   onReorderDays?: (days: Day[]) => void;
@@ -101,6 +103,8 @@ export function DayTabs({
   days,
   activeDayId,
   onDaySelect,
+  onTripViewSelect,
+  tripViewActive = false,
   onAddDay,
   onReorderDays,
   readOnly = false,
@@ -129,6 +133,32 @@ export function DayTabs({
 
   return (
     <div className="flex items-center gap-2 flex-wrap pb-2">
+      {onTripViewSelect && (
+        <div className="relative group shrink-0">
+          <div
+            className={[
+              'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-200 cursor-pointer border',
+              tripViewActive
+                ? 'bg-linear-to-r from-forest to-forest-light text-white shadow-sm border-forest/30'
+                : 'bg-parchment-mid text-ink hover:bg-parchment border-border/50',
+            ].join(' ')}
+            onClick={() => onTripViewSelect()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onTripViewSelect();
+              }
+            }}
+            title="View the full itinerary"
+          >
+            <LayoutList className="h-4 w-4 shrink-0" />
+            <span>Trip</span>
+          </div>
+        </div>
+      )}
+
       <DndContext 
         sensors={sensors} 
         collisionDetection={closestCenter} 
