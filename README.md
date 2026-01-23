@@ -1,16 +1,14 @@
 # Daily Dally
 
-A travel app where each day is a list of destinations with driving directions on a map.
+A travel app where each Day is a list of Destinations/Notes and a map with driving directions. Drag-and-drop to rearrange Day tabs and Destination cards.
 
-Days are displayed horizontally as tabs. Days and Destinations can be dragged and dropped to re-order.
+**Search** to add a Destination location. **Add note** adds a card without a location.
 
-You can add Notes, which are Destinations without an address and won't appear on the map.
+**Discover** uses SerpApi and Google Maps to find places you might want to add.
 
-You can share URLs with either edit or read-only permissions.
+No account required; Trips are accessed by ULID. Trip URLs can be shared with either Read-only or Edit permissions.
 
+Example Trip, Read-only link (use top-right menu to Clone)
+https://daily-dally.vercel.app/trip/01KENQZQPKY2WBW1MKC14TMGD5
 
 ![Daily Dally](./screenshots/daily-dally.png)
-
-https://daily-dally.vercel.app/trip/01KENQZQPKY2WBW1MKC14TMGD5 (view-only)
-
-_Mostly built on my phone with Cursor Agents_
