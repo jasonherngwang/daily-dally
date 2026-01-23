@@ -132,10 +132,11 @@
 
 @media (min-width: 1024px) {
   .map-sticky-lg {
-    height: var(--mapHeight, calc(100vh - 140px - 48px)) !important;
-    max-height: var(--mapHeight, calc(100vh - 140px - 48px)) !important;
-    min-height: var(--mapHeight, calc(100vh - 140px - 48px)) !important;
+    height: var(--mapHeight, calc(100vh - 200px - 48px)) !important;
+    /* max-height should not subtract padding to prevent overflow beyond viewport */
+    max-height: calc(100vh - var(--mapStickyTop, 200px)) !important;
+    min-height: var(--mapHeight, calc(100vh - 200px - 48px)) !important;
     position: sticky !important;
-    top: var(--mapStickyTop, 140px) !important;
+    top: var(--mapStickyTop, 200px) !important;
   }
 }

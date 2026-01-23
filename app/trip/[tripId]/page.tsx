@@ -30,7 +30,9 @@ export default function TripPage() {
     useTrip(tripToken);
   const isTripView = useMemo(() => searchParams.get('view') === 'trip', [searchParams]);
   const stickyStackRef = useRef<HTMLDivElement | null>(null);
+  const contentAreaRef = useRef<HTMLDivElement | null>(null);
   const [stickyStackHeight, setStickyStackHeight] = useState(0);
+  const [contentAreaTop, setContentAreaTop] = useState(0);
   const [isStickyOverContent, setIsStickyOverContent] = useState(false);
   const activeDayIndex = useMemo(() => {
     if (!trip || trip.days.length === 0) return 0;
@@ -76,29 +78,56 @@ export default function TripPage() {
   }, []);
 
   // Measure sticky header stack height so the map can stick directly below it (no magic numbers).
+  // Re-run when isLoading changes because content area isn't in DOM until loading completes.
   useEffect(() => {
-    const el = stickyStackRef.current;
-    if (!el) return;
+    const headerEl = stickyStackRef.current;
+    const contentEl = contentAreaRef.current;
+    if (!headerEl) return;
+    
     const update = () => {
-      // Use scrollHeight to get the full height including any overflow, or getBoundingClientRect for visual height
-      const height = el.scrollHeight || el.getBoundingClientRect().height;
-      setStickyStackHeight(Math.ceil(height));
+      // Measure header height
+      const headerRect = headerEl.getBoundingClientRect();
+      const height = Math.ceil(headerRect.height);
+      setStickyStackHeight(height);
+      
+      // Measure content area's top position at scroll=0 to get the exact natural starting position
+      // We need to account for current scroll position to get the "at rest" position.
+      // Also add the element's top padding since the map is inside the padded content area.
+      const currentContentEl = contentAreaRef.current;
+      if (currentContentEl) {
+        const contentRect = currentContentEl.getBoundingClientRect();
+        const paddingTop = parseFloat(getComputedStyle(currentContentEl).paddingTop) || 0;
+        // The inner content's natural top (when scroll=0) = element top + scroll + padding
+        const naturalTop = Math.ceil(contentRect.top + window.scrollY + paddingTop);
+        setContentAreaTop(naturalTop);
+      }
     };
+    
+    // Measure immediately and then again after layout
+    update();
     // Use requestAnimationFrame to ensure layout is complete on initial load
     let rafId = requestAnimationFrame(() => {
       update();
+      // Also measure after a short delay to catch any async content loading
+      setTimeout(update, 100);
+      setTimeout(update, 300); // Additional delayed measurement for fonts and dynamic content
     });
     const ro = new ResizeObserver(() => update());
-    ro.observe(el);
+    ro.observe(headerEl);
+    // Only observe content element if it exists
+    const currentContentEl = contentAreaRef.current;
+    if (currentContentEl) ro.observe(currentContentEl);
     window.addEventListener('resize', update);
     return () => {
       cancelAnimationFrame(rafId);
       ro.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, []);
+  }, [isLoading]); // Re-run when loading state changes
 
-  const mapStickyTopPx = stickyStackHeight > 0 ? stickyStackHeight + 16 : 140; // small fallback
+  // Use the measured content area top as the sticky position to prevent any vertical shifting.
+  // The map's sticky top should exactly match where it naturally starts in the document.
+  const mapStickyTopPx = contentAreaTop > 0 ? contentAreaTop : (stickyStackHeight > 0 ? stickyStackHeight + 16 : 200);
   const tripDayColors = useMemo(() => {
     if (!trip) return new Map<string, string>();
     return new Map(trip.days.map((d, idx) => [d.id, distinctRouteColor(idx)]));
@@ -505,7 +534,7 @@ export default function TripPage() {
       </div>
 
       {/* Content */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-6">
+      <div ref={contentAreaRef} className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-6">
         {/* Day View */}
         {!isTripView && activeDay && (
           <div className="flex flex-col gap-4 lg:gap-6 lg:flex-row lg:items-start">
@@ -544,7 +573,7 @@ export default function TripPage() {
                   top: `${mapStickyTopPx}px`,
                   position: 'sticky',
                   height: `calc(100vh - ${mapStickyTopPx}px - 48px)`,
-                  maxHeight: `calc(100vh - ${mapStickyTopPx}px - 48px)`,
+                  maxHeight: `calc(100vh - ${mapStickyTopPx}px)`,
                   minHeight: `calc(100vh - ${mapStickyTopPx}px - 48px)`,
                 } as React.CSSProperties
               }
@@ -667,7 +696,7 @@ export default function TripPage() {
                   top: `${mapStickyTopPx}px`,
                   position: 'sticky',
                   height: `calc(100vh - ${mapStickyTopPx}px - 48px)`,
-                  maxHeight: `calc(100vh - ${mapStickyTopPx}px - 48px)`,
+                  maxHeight: `calc(100vh - ${mapStickyTopPx}px)`,
                   minHeight: `calc(100vh - ${mapStickyTopPx}px - 48px)`,
                 } as React.CSSProperties
               }
