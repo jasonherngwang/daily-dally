@@ -119,7 +119,7 @@ export function TripHeader({
       const editToken = data.tokens?.editToken;
       if (!editToken) throw new Error('Clone succeeded but no edit token returned');
 
-      window.open(`/trip/${editToken}`, '_blank', 'noopener,noreferrer');
+      router.push(`/trip/${editToken}`);
       setShowMenu(false);
     } catch (e) {
       console.error(e);
